@@ -240,7 +240,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
   const subnetReqDur = flowSpeed === 'slow' ? '5.2s' : '2.6s';
   const subnetDataDur = flowSpeed === 'slow' ? '5.8s' : '2.9s';
 
-  // Sequential progression when attack is simulated (Steps 1 through 6; Step 7 executes upon remediation)
+  // Sequential progression when attack is simulated (Fast, brisk progression to Step 6: Incident Logging)
   useEffect(() => {
     if (!attackedSubnetId) {
       if (!isRemediating) {
@@ -251,11 +251,11 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
 
     setResponseStep(1);
     const timers = [
-      setTimeout(() => setResponseStep(2), 500),
-      setTimeout(() => setResponseStep(3), 1000),
-      setTimeout(() => setResponseStep(4), 1500),
-      setTimeout(() => setResponseStep(5), 2100),
-      setTimeout(() => setResponseStep(6), 2700),
+      setTimeout(() => setResponseStep(2), 120),
+      setTimeout(() => setResponseStep(3), 240),
+      setTimeout(() => setResponseStep(4), 380),
+      setTimeout(() => setResponseStep(5), 520),
+      setTimeout(() => setResponseStep(6), 680),
     ];
 
     return () => timers.forEach(t => clearTimeout(t));
@@ -316,7 +316,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     }));
   };
 
-  // Remediation Action: Change device IP address and reconnect to server in the simulation
+  // Remediation Action: Change device IP address and reconnect to server in the simulation (Fast & Responsive)
   const handleRemediate = () => {
     if (!attackedDevice || !attackedSubnetId) {
       handleReset();
@@ -345,10 +345,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       deviceId: targetDevice.id
     });
 
-    // PHASE 1: Re-assign IP Lease (DHCP renewal + ARP flush)
+    // PHASE 1: Re-assign IP Lease (starts immediately)
     setRemediationPhase('assigning_ip');
 
-    // PHASE 2 (after 1.3s): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Core Server (10.10.0.1)
+    // PHASE 2 (after 350ms): Device receives new IP, initiates fast TLS 1.3 handshake to reconnect to Core Server (10.10.0.1)
     setTimeout(() => {
       // Reassign IP address of device in subnet state immediately so nodes update
       setSubnets(prev => {
@@ -367,9 +367,9 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
 
       setRemediationPhase('reconnecting');
       setReconnectingSubnetId(targetSubnet);
-    }, 1300);
+    }, 350);
 
-    // PHASE 3 (after 3.5s): Server acknowledges reconnection, TLS tunnel active, telemetry restored
+    // PHASE 3 (after 900ms total): Server acknowledges reconnection, TLS tunnel active, telemetry restored
     setTimeout(() => {
       setRemediationPhase('restored');
       setRemediationLog({
@@ -387,7 +387,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       // Reset phase to idle after displaying verification
       setTimeout(() => {
         setRemediationPhase('idle');
-      }, 4000);
+      }, 2500);
 
       // Broadcast remediation completion and server reconnection to global feeds
       window.dispatchEvent(new CustomEvent('abb_attack_state', {
@@ -405,7 +405,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
           }
         }
       }));
-    }, 3600);
+    }, 900);
   };
 
   const isAttacking = attackedSubnetId !== null;
@@ -714,12 +714,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
               {remediationPhase === 'reconnecting' && (
                 <g>
                   <circle r="9" fill="#00D2FF" opacity="0.5">
-                    <animateMotion dur="1.1s" repeatCount="indefinite">
+                    <animateMotion dur="0.55s" repeatCount="indefinite">
                       <mpath href="#trunk-reconn-path" />
                     </animateMotion>
                   </circle>
                   <circle r="4.5" fill="#00D2FF">
-                    <animateMotion dur="1.1s" repeatCount="indefinite">
+                    <animateMotion dur="0.55s" repeatCount="indefinite">
                       <mpath href="#trunk-reconn-path" />
                     </animateMotion>
                   </circle>
@@ -885,12 +885,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 /* Reconnection Handshake Packet (Cyan #00D2FF) */
                 <g>
                   <circle r="9" fill="#00D2FF" opacity="0.5">
-                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                    <animateMotion dur="0.6s" repeatCount="indefinite">
                       <mpath href="#path-reconn-a" />
                     </animateMotion>
                   </circle>
                   <circle r="4.5" fill="#00D2FF">
-                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                    <animateMotion dur="0.6s" repeatCount="indefinite">
                       <mpath href="#path-reconn-a" />
                     </animateMotion>
                   </circle>
@@ -948,12 +948,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 /* Reconnection Handshake Packet (Cyan #00D2FF) */
                 <g>
                   <circle r="9" fill="#00D2FF" opacity="0.5">
-                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                    <animateMotion dur="0.6s" repeatCount="indefinite">
                       <mpath href="#path-reconn-b" />
                     </animateMotion>
                   </circle>
                   <circle r="4.5" fill="#00D2FF">
-                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                    <animateMotion dur="0.6s" repeatCount="indefinite">
                       <mpath href="#path-reconn-b" />
                     </animateMotion>
                   </circle>
@@ -1011,12 +1011,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 /* Reconnection Handshake Packet (Cyan #00D2FF) */
                 <g>
                   <circle r="9" fill="#00D2FF" opacity="0.5">
-                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                    <animateMotion dur="0.6s" repeatCount="indefinite">
                       <mpath href="#path-reconn-c" />
                     </animateMotion>
                   </circle>
                   <circle r="4.5" fill="#00D2FF">
-                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                    <animateMotion dur="0.6s" repeatCount="indefinite">
                       <mpath href="#path-reconn-c" />
                     </animateMotion>
                   </circle>
