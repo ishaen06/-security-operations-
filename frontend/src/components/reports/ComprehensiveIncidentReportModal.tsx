@@ -1,29 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { 
   X, 
-  Download, 
   Printer, 
-  FileText, 
-  AlertTriangle, 
-  ShieldAlert, 
-  ShieldCheck, 
-  Activity, 
-  Server, 
-  Network, 
   Clock, 
-  Terminal, 
-  CheckCircle2, 
-  Copy, 
-  ExternalLink,
-  Flame,
-  Globe,
-  Sliders,
-  Cpu,
-  Layers,
-  Lock,
-  ArrowUpRight,
-  Shield,
-  Target
+  ShieldAlert, 
+  Network, 
+  Activity, 
+  Sliders, 
+  Globe, 
+  ShieldCheck, 
+  Target,
+  Flame
 } from 'lucide-react';
 
 export type SubnetKey = 'subnet-a' | 'subnet-b' | 'subnet-c' | 'drill';
@@ -55,12 +42,10 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
   activeAttackDevice,
   isDrillActive = false
 }) => {
-  // Determine default selected subnet tab based on current simulation or drill
+  // Subnet selection
   const [selectedSubnet, setSelectedSubnet] = useState<SubnetKey>('subnet-c');
-  const [copied, setCopied] = useState<boolean>(false);
-  const [activeTab, setActiveTab] = useState<'overview' | 'parameters' | 'dns' | 'remediation'>('overview');
 
-  // Sync selected subnet when active attack changes
+  // Automatically select active attack subnet when an attack is triggered
   useEffect(() => {
     if (activeAttackSubnet === 'subnet-a') setSelectedSubnet('subnet-a');
     else if (activeAttackSubnet === 'subnet-b') setSelectedSubnet('subnet-b');
@@ -81,10 +66,11 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
       compromisedHosts: ['10.10.10.14 (Active Directory DC)', '10.10.10.84 (Corporate Bastion Jump)'],
       attackName: activeAttackVector || 'Distributed Kerberos Credential Spray & Lateral Movement',
       attackType: 'Credential Access / Lateral Movement (MITRE T1110.003)',
-      cve: 'CVE-2024-21887 (Ivanti Connect Secure Authentication Bypass)',
+      cve: 'CVE-2024-21887 (Ivanti Connect Secure Auth Bypass)',
       incidentTime: '2026-09-11 11:42:18 UTC',
       duration: '48m 12s active • Airgap enforced in 24s',
       severity: 'HIGH',
+      containmentStatus: 'Airgap Isolated & Contained',
       impact: 'Attempted domain privilege escalation against corporate identity controllers. Zero-trust microsegmentation blocked east-west pivoting toward SCADA and operational subnets.',
       parametersInDanger: [
         {
@@ -130,7 +116,7 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
           type: 'A',
           resolvedIp: '194.26.29.112',
           resolver: '10.10.0.53:53',
-          reputation: 'PHISHING / CREDENTIAL HARVESTER',
+          reputation: 'PHISHING / HARVESTER',
           action: 'BLOCKED AT FIREWALL'
         },
         {
@@ -140,6 +126,32 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
           resolver: '10.10.10.5:53',
           reputation: 'LEGITIMATE INTERNAL',
           action: 'INSPECTED VIA DPI'
+        }
+      ],
+      remediationSteps: [
+        {
+          step: 1,
+          title: 'Immediate Network Airgap & Isolation',
+          status: 'COMPLETED (24s latency)',
+          action: 'Isolated interface eth0 on core gateway; injected dynamic FW-DENY-ALL rule to sever external ingress and halt east-west propagation.'
+        },
+        {
+          step: 2,
+          title: 'Kerberos & Identity Token Revocation',
+          status: 'COMPLETED',
+          action: 'Flushed KRBTGT Kerberos master ticket twice to invalidate forged Golden Tickets; forced credential reset for all Domain Admin accounts.'
+        },
+        {
+          step: 3,
+          title: 'Host Forensic Acquisition & Quarantine',
+          status: 'IN PROGRESS',
+          action: 'Captured volatile RAM dumps from 10.10.10.14 and 10.10.10.84; severed lateral bastion jump sessions via EDR quarantine.'
+        },
+        {
+          step: 4,
+          title: 'Patch Deployment & System Restoration',
+          status: 'PENDING APPROVAL',
+          action: 'Apply vendor security patch for CVE-2024-21887; verify LDAP query baseline thresholds before reconnecting gateway routing.'
         }
       ]
     },
@@ -152,10 +164,11 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
       compromisedHosts: ['10.10.20.14 (ABB PLM Server)', '10.10.20.65 (Fleet Analytics Node)'],
       attackName: activeAttackVector || 'High-Bandwidth Influx & Time-Series Data Tampering',
       attackType: 'Data Manipulation / Denial of Service (MITRE T0814)',
-      cve: 'CVE-2024-6387 (regreSSHion OpenSSH Signal Handler Race Condition)',
+      cve: 'CVE-2024-6387 (regreSSHion OpenSSH Signal Handler Race)',
       incidentTime: '2026-09-11 12:14:02 UTC',
       duration: '32m 44s active • Contained in 42s',
       severity: 'CRITICAL',
+      containmentStatus: 'Airgap Isolated & Contained',
       impact: 'Attempted memory injection into telemetry analytics engine and modification of historical sensor baselines. Threat actor severed at perimeter router before database corruption.',
       parametersInDanger: [
         {
@@ -212,6 +225,32 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
           reputation: 'LEGITIMATE INTERNAL',
           action: 'MONITORED NOMINAL'
         }
+      ],
+      remediationSteps: [
+        {
+          step: 1,
+          title: 'Immediate Ingress/Egress Isolation',
+          status: 'COMPLETED (42s latency)',
+          action: 'Severed eth1 perimeter gateway link; dropped all incoming SSH connections on port 22 across Subnet B.'
+        },
+        {
+          step: 2,
+          title: 'OpenSSH Daemon Process Termination & Patching',
+          status: 'IN PROGRESS',
+          action: 'Killed vulnerable sshd worker processes exploited via CVE-2024-6387; patched OpenSSH binary to verified safe release.'
+        },
+        {
+          step: 3,
+          title: 'Time-Series Database Integrity Check',
+          status: 'IN PROGRESS',
+          action: 'Restored TSDB historical metrics from golden cryptographic replica snapshot; purged malformed ingestion batches.'
+        },
+        {
+          step: 4,
+          title: 'Compute Load Baseline & Resumption',
+          status: 'PENDING APPROVAL',
+          action: 'Verify CPU load returns below 35% nominal threshold before lifting boundary routing restrictions.'
+        }
       ]
     },
     'subnet-c': {
@@ -227,6 +266,7 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
       incidentTime: '2026-09-11 13:05:49 UTC',
       duration: '18m 22s active • Airgap Severed in 18s',
       severity: 'CRITICAL',
+      containmentStatus: 'Airgap Isolated & Contained',
       impact: 'Unauthorized function code 0x06 (Write Single Register) targeted turbine controller and overpressure valves. Mechanical SIL-3 emergency interlocks held; physical damage averted by sub-second airgap isolation.',
       parametersInDanger: [
         {
@@ -283,21 +323,48 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
           reputation: 'INTERNAL OT FABRIC',
           action: 'AIRGAP ENFORCED'
         }
+      ],
+      remediationSteps: [
+        {
+          step: 1,
+          title: 'Immediate Industrial Airgap Enforcement',
+          status: 'COMPLETED (18s latency)',
+          action: 'Physically and logically severed boundary interface eth2; deployed rule FW-DENY-ALL-SUBNET-C to stop unauthorized Modbus writes.'
+        },
+        {
+          step: 2,
+          title: 'C2 Sinkhole & DNS Poison Neutralization',
+          status: 'COMPLETED',
+          action: 'Sinkholed feodo-tracker.abuse.ch C2 domain to 127.0.0.1 via Response Policy Zone (RPZ); blocked all outbound port 443 telemetry.'
+        },
+        {
+          step: 3,
+          title: 'Modbus Register Golden State Rollback',
+          status: 'IN PROGRESS',
+          action: 'Restored Modbus Holding Register 40001 to nominal 3,000 RPM and Register 40105 to Auto-Relief (0x01) from golden hash snapshot.'
+        },
+        {
+          step: 4,
+          title: 'PLC Firmware Verification & SIL-3 Validation',
+          status: 'PENDING APPROVAL',
+          action: 'Verify cryptographic checksums on PLC controllers; confirm SIL-3 emergency mechanical interlocks are operational prior to re-arming.'
+        }
       ]
     },
     'drill': {
       name: 'Emergency Drill Simulation (All Subnets Enforced)',
       role: 'Full-Scale Enterprise Cyber Defense Drill',
       vlan: 'VLAN 10, 20, 30',
-      gateway: '10.10.0.1 (Unified Edge Firewall)',
+      gateway: '10.10.0.1 (Unified Edge Gateway)',
       totalHosts: 762,
       compromisedHosts: ['10.10.30.42 (SCADA Master)', '10.10.20.14 (PLM Server)', '10.10.10.84 (Corporate Bastion)'],
-      attackName: 'Simulated CISA KEV CVE-2024-3400 & Abuse.ch Feodo Botnet Combined Assault',
-      attackType: 'Full Cyber-Physical Assault Exercise (ISO/IEC 27035)',
-      cve: 'CISA KEV Catalog CVE-2024-3400 + Abuse.ch Feodo IP Blocklist',
+      attackName: 'Simulated CISA KEV CVE-2024-3400 & Abuse.ch Feodo Botnet Assault',
+      attackType: 'Full Cyber-Physical Exercise (ISO/IEC 27035)',
+      cve: 'CISA KEV CVE-2024-3400 + Abuse.ch Feodo Blocklist',
       incidentTime: '2026-09-11 14:00:00 UTC',
-      duration: 'Ongoing Simulation Exercise • Live SSE Sync Active',
+      duration: 'Live Drill Active • Real-Time SSE Feed Synchronized',
       severity: 'CRITICAL',
+      containmentStatus: 'Airgap Isolated & Contained',
       impact: 'Controlled live-fire red team exercise testing SOC tier 1-3 triage speed, airgap microsegmentation enforcement, and real-time DNS sinkhole propagation.',
       parametersInDanger: [
         {
@@ -339,6 +406,32 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
           reputation: 'CISA KEV IoC CONTROL',
           action: 'LOGGED & SINKHOLED'
         }
+      ],
+      remediationSteps: [
+        {
+          step: 1,
+          title: 'Automated Drill Containment Trigger',
+          status: 'COMPLETED (< 15s latency)',
+          action: 'Simulated gateway rules auto-injected; edge routing severed across affected test interfaces.'
+        },
+        {
+          step: 2,
+          title: 'DNS Sinkhole Verification Test',
+          status: 'COMPLETED',
+          action: 'Confirmed all malicious test domains resolved to local sinkhole IP 127.0.0.1 with zero packet leakage.'
+        },
+        {
+          step: 3,
+          title: 'Telemetry Reconciliation',
+          status: 'IN PROGRESS',
+          action: 'Reconciled 25-log emergency batch queue against historical baseline logs in backend storage.'
+        },
+        {
+          step: 4,
+          title: 'SOC Post-Drill Evaluation',
+          status: 'PENDING COMPLETION',
+          action: 'Benchmark SOC response latency against ISO/IEC 27035 target standards.'
+        }
       ]
     }
   };
@@ -349,83 +442,30 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
     window.print();
   };
 
-  const handleCopySummary = () => {
-    const summaryText = `[ABB SECURITY INCIDENT REPORT - ${current.name}]
-Incident Time: ${current.incidentTime} (Duration: ${current.duration})
-Compromised Subnet: ${current.name} (${current.role})
-Attack Vector: ${current.attackName} (${current.cve})
-Attack Type: ${current.attackType}
-Operational Effect: ${current.impact}
-Parameters In Danger:
-${current.parametersInDanger.map(p => ` - ${p.name}: Current=${p.current} (Target=${p.target}) [${p.danger}]`).join('\n')}
-DNS Mapping:
-${current.dnsMapping.map(d => ` - ${d.domain} -> ${d.resolvedIp} (${d.reputation}) -> ${d.action}`).join('\n')}
-Remediation:
- 1. Immediate Airgap & Boundary Firewall Rule Injection (FW-DENY-ALL)
- 2. Revocation of Active Directory & SCADA engineering tokens
- 3. Volatile RAM dump & EDR host isolation
- 4. Restoration of Modbus Holding Registers from cryptographic golden backup`;
-
-    navigator.clipboard.writeText(summaryText);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2500);
-  };
-
-  const handleDownloadJson = () => {
-    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(current, null, 2));
-    const downloadAnchor = document.createElement('a');
-    downloadAnchor.setAttribute("href", dataStr);
-    downloadAnchor.setAttribute("download", `abb_incident_report_${selectedSubnet}.json`);
-    document.body.appendChild(downloadAnchor);
-    downloadAnchor.click();
-    downloadAnchor.remove();
-  };
-
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm animate-fadeIn">
-      <div className="bg-white dark:bg-[#16191E] border border-[#CED4DA] dark:border-[#282D35] rounded-sm shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden">
+      <div className="bg-white dark:bg-[#16191E] border border-[#CED4DA] dark:border-[#282D35] rounded-sm shadow-2xl w-full max-w-5xl max-h-[94vh] flex flex-col overflow-hidden">
         
-        {/* Top Header Bar */}
-        <div className="p-5 border-b border-[#E2E6EA] dark:border-[#282D35] bg-[#F8F9FA] dark:bg-[#1B2027] flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Modal Header */}
+        <div className="p-4 sm:p-5 border-b border-[#E2E6EA] dark:border-[#282D35] bg-[#F8F9FA] dark:bg-[#1B2027] flex items-center justify-between gap-4 shrink-0">
           <div>
             {/* Signature ABB Red Accent Bar */}
-            <div className="w-12 h-1.5 bg-[#FF000F] mb-2" />
-            <div className="flex items-center gap-3">
-              <span className="font-outrun uppercase text-xs font-bold tracking-[0.2em] text-[#FF000F]">
-                ABB CYBERSECURITY INCIDENT DOSSIER
+            <div className="w-12 h-1.5 bg-[#FF000F] mb-1.5" />
+            <div className="flex items-center gap-2">
+              <span className="font-outrun uppercase text-[11px] font-bold tracking-[0.2em] text-[#FF000F]">
+                ABB INCIDENT DOSSIER
               </span>
-              <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm border border-[#CED4DA] dark:border-[#343B45] text-[#495057] dark:text-[#9BA3AF] bg-white dark:bg-[#16191E]">
-                ISO/IEC 27035 & IEC 62443 COMPLIANT
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded-sm bg-red-100 dark:bg-red-950/60 text-[#FF000F] font-bold">
+                SINGLE-PAGE REPORT
               </span>
             </div>
-            <h2 className="font-sans font-bold text-xl sm:text-2xl text-[#181B1F] dark:text-white tracking-tight mt-1">
-              Active Security Incident & Threat Telemetry Report
+            <h2 className="font-sans font-bold text-lg sm:text-xl text-[#181B1F] dark:text-white tracking-tight mt-0.5">
+              Security Incident & Threat Analysis Report
             </h2>
-            <p className="text-xs text-[#6C757D] dark:text-[#9BA3AF] mt-0.5">
-              Comprehensive attack forensics • Parameters in danger • DNS mapping • Step-by-step remediation
-            </p>
           </div>
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleCopySummary}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-sm border border-[#CED4DA] dark:border-[#343B45] bg-white dark:bg-[#1F242C] text-[#181B1F] dark:text-white hover:border-[#FF000F] transition-colors"
-              title="Copy incident executive summary to clipboard"
-            >
-              {copied ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" /> : <Copy className="w-3.5 h-3.5 text-[#6C757D]" />}
-              <span>{copied ? 'Copied' : 'Copy Summary'}</span>
-            </button>
-
-            <button
-              onClick={handleDownloadJson}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono rounded-sm border border-[#CED4DA] dark:border-[#343B45] bg-white dark:bg-[#1F242C] text-[#181B1F] dark:text-white hover:border-[#FF000F] transition-colors"
-              title="Download structured JSON report"
-            >
-              <Download className="w-3.5 h-3.5 text-[#FF000F]" />
-              <span className="hidden sm:inline">JSON</span>
-            </button>
-
             <button
               onClick={handlePrint}
               className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-mono bg-[#FF000F] text-white hover:bg-[#D9000D] font-bold rounded-sm transition-colors shadow-sm"
@@ -437,7 +477,7 @@ Remediation:
 
             <button
               onClick={onClose}
-              className="p-1.5 text-[#6C757D] hover:text-[#181B1F] dark:hover:text-white rounded-sm transition-colors ml-2"
+              className="p-1.5 text-[#6C757D] hover:text-[#181B1F] dark:hover:text-white rounded-sm transition-colors ml-1"
               title="Close incident report"
             >
               <X className="w-5 h-5" />
@@ -446,557 +486,405 @@ Remediation:
         </div>
 
         {/* Subnet Selector Rail */}
-        <div className="px-5 py-2.5 bg-[#F1F3F5] dark:bg-[#14171C] border-b border-[#E2E6EA] dark:border-[#282D35] flex flex-wrap items-center justify-between gap-3 text-xs font-mono">
+        <div className="px-4 sm:px-5 py-2.5 bg-[#F1F3F5] dark:bg-[#14171C] border-b border-[#E2E6EA] dark:border-[#282D35] flex flex-wrap items-center justify-between gap-3 text-xs font-mono shrink-0">
           <div className="flex items-center gap-2">
             <span className="text-[#6C757D] dark:text-[#9BA3AF] uppercase text-[11px] font-bold tracking-wider">
-              Select Subnet Scope:
+              Select Subnet:
             </span>
             <div className="inline-flex rounded-xs border border-[#CED4DA] dark:border-[#343B45] overflow-hidden bg-white dark:bg-[#1F242C]">
               <button
                 onClick={() => setSelectedSubnet('subnet-c')}
-                className={`px-3 py-1.5 transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1 transition-colors flex items-center gap-1.5 ${
                   selectedSubnet === 'subnet-c'
                     ? 'bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-bold'
                     : 'text-[#495057] dark:text-[#9BA3AF] hover:bg-[#E9ECEF] dark:hover:bg-[#282D35]'
                 }`}
               >
                 <span className="w-2 h-2 rounded-full bg-[#FF000F] animate-pulse" />
-                <span>Subnet C (10.10.30.0/24) - Industrial</span>
+                <span>Subnet C (Industrial)</span>
               </button>
 
               <button
                 onClick={() => setSelectedSubnet('subnet-b')}
-                className={`px-3 py-1.5 transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1 transition-colors flex items-center gap-1.5 ${
                   selectedSubnet === 'subnet-b'
                     ? 'bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-bold'
                     : 'text-[#495057] dark:text-[#9BA3AF] hover:bg-[#E9ECEF] dark:hover:bg-[#282D35]'
                 }`}
               >
                 <span className="w-2 h-2 rounded-full bg-amber-500" />
-                <span>Subnet B (10.10.20.0/24) - Operations</span>
+                <span>Subnet B (Operations)</span>
               </button>
 
               <button
                 onClick={() => setSelectedSubnet('subnet-a')}
-                className={`px-3 py-1.5 transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1 transition-colors flex items-center gap-1.5 ${
                   selectedSubnet === 'subnet-a'
                     ? 'bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-bold'
                     : 'text-[#495057] dark:text-[#9BA3AF] hover:bg-[#E9ECEF] dark:hover:bg-[#282D35]'
                 }`}
               >
                 <span className="w-2 h-2 rounded-full bg-blue-500" />
-                <span>Subnet A (10.10.10.0/24) - Corporate</span>
+                <span>Subnet A (Corporate)</span>
               </button>
 
               <button
                 onClick={() => setSelectedSubnet('drill')}
-                className={`px-3 py-1.5 transition-colors flex items-center gap-1.5 ${
+                className={`px-3 py-1 transition-colors flex items-center gap-1.5 ${
                   selectedSubnet === 'drill'
                     ? 'bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-bold'
                     : 'text-[#495057] dark:text-[#9BA3AF] hover:bg-[#E9ECEF] dark:hover:bg-[#282D35]'
                 }`}
               >
                 <Flame className="w-3 h-3 text-[#FF000F]" />
-                <span>CISA KEV Emergency Drill</span>
+                <span>Drill Mode</span>
               </button>
             </div>
           </div>
 
           <div className="flex items-center gap-2 text-[11px]">
-            <span className="text-[#6C757D] dark:text-[#9BA3AF]">Active Airgap State:</span>
+            <span className="text-[#6C757D] dark:text-[#9BA3AF]">Airgap Status:</span>
             <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/60 border border-red-300 dark:border-red-800 text-[#FF000F] font-bold uppercase rounded-xs">
               AIRGAP ISOLATED
             </span>
           </div>
         </div>
 
-        {/* Targeted Compromised Device Callout Banner (when device attack is simulated) */}
+        {/* Targeted Endpoint Banner (if active attack device exists) */}
         {activeAttackDevice && (
-          <div className="mx-5 mt-4 p-3.5 bg-red-50 dark:bg-red-950/40 border-2 border-[#FF000F] rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono animate-fadeIn">
-            <div className="flex items-start sm:items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-[#FF000F] animate-ping shrink-0 mt-1 sm:mt-0" />
-              <div>
-                <span className="font-bold text-[#FF000F] uppercase tracking-wider flex items-center gap-1">
-                  <Target className="w-3.5 h-3.5 text-[#FF000F]" />
-                  TARGETED ENDPOINT UNDER ACTIVE EXPLOIT:
-                </span>
-                <div className="mt-0.5">
-                  <span className="font-bold text-[#181B1F] dark:text-white text-sm">
-                    {activeAttackDevice.hostname} ({activeAttackDevice.ip})
-                  </span>
-                  <span className="text-[#6C757D] dark:text-[#9BA3AF] ml-2">
-                    • Role: {activeAttackDevice.role} • Port: {activeAttackDevice.port}
-                  </span>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="px-2 py-1 bg-[#FF000F] text-white font-bold rounded-xs text-[10px] uppercase">
-                {activeAttackDevice.cve}
+          <div className="mx-4 sm:mx-6 mt-4 p-3 bg-red-50 dark:bg-red-950/40 border border-[#FF000F] rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs font-mono shrink-0">
+            <div className="flex items-center gap-2">
+              <Target className="w-4 h-4 text-[#FF000F] shrink-0" />
+              <span className="font-bold text-[#FF000F] uppercase">Targeted Device:</span>
+              <span className="font-bold text-[#181B1F] dark:text-white">
+                {activeAttackDevice.hostname || 'SCADA Master'} ({activeAttackDevice.ip || '10.10.30.42'})
               </span>
-              <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border border-emerald-300 dark:border-emerald-800 px-2 py-0.5 rounded-xs">
+              <span className="text-[#6C757D] dark:text-[#9BA3AF]">
+                • Port {activeAttackDevice.port || '502'} • {activeAttackDevice.role || 'Industrial Controller'}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 bg-[#FF000F] text-white font-bold rounded-xs text-[10px]">
+                {activeAttackDevice.cve || current.cve.split(' ')[0]}
+              </span>
+              <span className="text-emerald-600 dark:text-emerald-400 font-bold text-[10px]">
                 Zero-Trust Airgap Enforced
               </span>
             </div>
           </div>
         )}
 
-        {/* Navigation Section Tabs */}
-        <div className="flex items-center gap-1 px-5 pt-3 border-b border-[#E2E6EA] dark:border-[#282D35] bg-white dark:bg-[#16191E] font-sans text-xs">
-          <button
-            onClick={() => setActiveTab('overview')}
-            className={`pb-2.5 px-3 border-b-2 font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'overview'
-                ? 'border-[#FF000F] text-[#FF000F]'
-                : 'border-transparent text-[#6C757D] dark:text-[#9BA3AF] hover:text-[#181B1F] dark:hover:text-white'
-            }`}
-          >
-            <ShieldAlert className="w-4 h-4" />
-            <span>Incident & Attack Overview</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('parameters')}
-            className={`pb-2.5 px-3 border-b-2 font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'parameters'
-                ? 'border-[#FF000F] text-[#FF000F]'
-                : 'border-transparent text-[#6C757D] dark:text-[#9BA3AF] hover:text-[#181B1F] dark:hover:text-white'
-            }`}
-          >
-            <Sliders className="w-4 h-4" />
-            <span>Parameters in Danger ({current.parametersInDanger.length})</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('dns')}
-            className={`pb-2.5 px-3 border-b-2 font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'dns'
-                ? 'border-[#FF000F] text-[#FF000F]'
-                : 'border-transparent text-[#6C757D] dark:text-[#9BA3AF] hover:text-[#181B1F] dark:hover:text-white'
-            }`}
-          >
-            <Globe className="w-4 h-4" />
-            <span>DNS Mapping & Threat Resolution</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('remediation')}
-            className={`pb-2.5 px-3 border-b-2 font-bold transition-all flex items-center gap-1.5 ${
-              activeTab === 'remediation'
-                ? 'border-[#FF000F] text-[#FF000F]'
-                : 'border-transparent text-[#6C757D] dark:text-[#9BA3AF] hover:text-[#181B1F] dark:hover:text-white'
-            }`}
-          >
-            <ShieldCheck className="w-4 h-4" />
-            <span>Step-by-Step Remediation</span>
-          </button>
-        </div>
-
-        {/* Main Content Area */}
-        <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-5 text-[#181B1F] dark:text-white font-sans">
+        {/* SINGLE-PAGE SCROLLABLE REPORT CONTENT - STRICTLY THE 7 REQUESTED SECTIONS */}
+        <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-6 text-[#181B1F] dark:text-white font-sans print:p-0 print:overflow-visible">
           
-          {/* TAB 1: OVERVIEW & ATTACK DETAILS */}
-          {activeTab === 'overview' && (
-            <div className="space-y-5 animate-fadeIn">
-              {/* High-Level Metadata Grid */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 font-mono text-xs">
-                <div className="p-3.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-sm">
-                  <span className="text-[10px] uppercase text-[#6C757D] dark:text-[#9BA3AF] block">TIME OF INCIDENT</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Clock className="w-4 h-4 text-[#FF000F]" />
-                    <span className="font-bold text-sm text-[#181B1F] dark:text-white">{current.incidentTime}</span>
-                  </div>
-                  <span className="text-[10px] text-[#868E96] mt-0.5 block">{current.duration}</span>
-                </div>
+          {/* 1. TIME OF INCIDENT */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <Clock className="w-4 h-4 text-[#FF000F]" />
+              <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                1. Time of Incident
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+              <div className="p-3 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
+                <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] uppercase block">Timestamp (UTC)</span>
+                <span className="font-bold text-sm text-[#181B1F] dark:text-white mt-1 block">{current.incidentTime}</span>
+                <span className="text-[10px] text-[#868E96] mt-0.5 block">Precise NTP Synchronized</span>
+              </div>
+              <div className="p-3 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
+                <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] uppercase block">Active Duration & Containment Latency</span>
+                <span className="font-bold text-sm text-[#181B1F] dark:text-white mt-1 block">{current.duration}</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold mt-0.5 block">Automated Sub-Second Isolation</span>
+              </div>
+              <div className="p-3 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
+                <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] uppercase block">Current Incident Status</span>
+                <span className="font-bold text-sm text-[#FF000F] mt-1 block">{current.containmentStatus}</span>
+                <span className="text-[10px] text-[#868E96] mt-0.5 block">Perimeter Gateway Rule Active</span>
+              </div>
+            </div>
+          </div>
 
-                <div className="p-3.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-sm">
-                  <span className="text-[10px] uppercase text-[#6C757D] dark:text-[#9BA3AF] block">COMPROMISED SUBNET</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <Network className="w-4 h-4 text-[#FF000F]" />
-                    <span className="font-bold text-sm text-[#181B1F] dark:text-white truncate">{current.name.split(' ')[0]} {current.name.split(' ')[1]}</span>
-                  </div>
-                  <span className="text-[10px] text-[#FF000F] font-bold mt-0.5 block">CONTAINED VIA ZERO-TRUST</span>
-                </div>
+          {/* 2. WHAT THE ATTACK IS */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <ShieldAlert className="w-4 h-4 text-[#FF000F]" />
+              <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                2. What the Attack Is
+              </h3>
+            </div>
+            <div className="space-y-2.5 text-xs font-mono">
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 p-2 bg-[#F8F9FA] dark:bg-[#1F242C] rounded-xs">
+                <span className="text-[#6C757D] dark:text-[#9BA3AF]">Threat Vector:</span>
+                <span className="font-bold text-[#181B1F] dark:text-white text-sm">{current.attackName}</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 p-2 bg-[#F8F9FA] dark:bg-[#1F242C] rounded-xs">
+                <span className="text-[#6C757D] dark:text-[#9BA3AF]">Vulnerability / CVE:</span>
+                <span className="font-bold text-[#FF000F]">{current.cve}</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 p-2 bg-[#F8F9FA] dark:bg-[#1F242C] rounded-xs">
+                <span className="text-[#6C757D] dark:text-[#9BA3AF]">Classification (MITRE ATT&CK):</span>
+                <span className="text-blue-600 dark:text-blue-400 font-bold">{current.attackType}</span>
+              </div>
+              <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1 p-2 bg-[#F8F9FA] dark:bg-[#1F242C] rounded-xs">
+                <span className="text-[#6C757D] dark:text-[#9BA3AF]">Threat Classification / Method:</span>
+                <span className="text-[#495057] dark:text-[#CBD5E1]">
+                  Malicious packet injection attempting unauthorized state override via protocol manipulation and Command & Control callback.
+                </span>
+              </div>
+            </div>
+          </div>
 
-                <div className="p-3.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-sm">
-                  <span className="text-[10px] uppercase text-[#6C757D] dark:text-[#9BA3AF] block">ATTACK CLASSIFICATION</span>
-                  <div className="flex items-center gap-1.5 mt-1">
-                    <ShieldAlert className="w-4 h-4 text-[#FF000F]" />
-                    <span className="font-bold text-xs text-[#FF000F] truncate">{current.attackType.split('(')[0]}</span>
-                  </div>
-                  <span className="text-[10px] text-[#868E96] mt-0.5 block">{current.cve.split(' ')[0]}</span>
+          {/* 3. WHICH SUBNET IS COMPROMISED */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <Network className="w-4 h-4 text-[#FF000F]" />
+              <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                3. Which Subnet is Compromised
+              </h3>
+            </div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
+              <div className="space-y-2 p-3 bg-[#F8F9FA] dark:bg-[#1F242C] rounded-xs border border-[#E2E6EA] dark:border-[#2E3540]">
+                <div className="flex justify-between">
+                  <span className="text-[#6C757D] dark:text-[#9BA3AF]">Subnet Name & CIDR:</span>
+                  <strong className="text-[#181B1F] dark:text-white">{current.name}</strong>
                 </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6C757D] dark:text-[#9BA3AF]">Operational Purpose:</span>
+                  <span className="text-[#495057] dark:text-[#CBD5E1] text-right">{current.role}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6C757D] dark:text-[#9BA3AF]">VLAN:</span>
+                  <span className="text-[#495057] dark:text-[#CBD5E1]">{current.vlan}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#6C757D] dark:text-[#9BA3AF]">Gateway Interface:</span>
+                  <span className="text-[#495057] dark:text-[#CBD5E1]">{current.gateway}</span>
+                </div>
+              </div>
 
-                <div className="p-3.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-sm">
-                  <span className="text-[10px] uppercase text-[#6C757D] dark:text-[#9BA3AF] block">SEVERITY / THREAT SCORE</span>
-                  <div className="flex items-center gap-2 mt-1">
-                    <span className="px-2 py-0.5 bg-[#FF000F] text-white font-bold text-xs uppercase rounded-xs">
-                      {current.severity}
+              <div className="space-y-2 p-3 bg-[#F8F9FA] dark:bg-[#1F242C] rounded-xs border border-[#E2E6EA] dark:border-[#2E3540]">
+                <span className="text-[#6C757D] dark:text-[#9BA3AF] block font-bold">Compromised / Targeted Hosts:</span>
+                <div className="space-y-1.5">
+                  {current.compromisedHosts.map((host, i) => (
+                    <div key={i} className="p-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xs flex items-center justify-between">
+                      <span className="font-bold text-[#FF000F]">{host}</span>
+                      <span className="text-[10px] uppercase font-bold text-red-700 dark:text-red-400">ISOLATED</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 4. EFFECT OF HAPPENING */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <Activity className="w-4 h-4 text-[#FF000F]" />
+              <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                4. Effect of Happening
+              </h3>
+            </div>
+            <p className="text-xs text-[#495057] dark:text-[#CBD5E1] leading-relaxed mb-3">
+              {current.impact}
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
+              <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
+                <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] block">Operational Equipment Safety</span>
+                <strong className="text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">0 Physical Damage</strong>
+                <span className="text-[10px] text-[#868E96]">Mechanical SIL-3 hardware interlocks held</span>
+              </div>
+              <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
+                <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] block">Blast Radius</span>
+                <strong className="text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">Confined to {current.name.split(' ')[0]}</strong>
+                <span className="text-[10px] text-[#868E96]">Zero lateral spillover to other subnets</span>
+              </div>
+              <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
+                <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] block">Data Exfiltration Status</span>
+                <strong className="text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">Zero Records Lost</strong>
+                <span className="text-[10px] text-[#868E96]">Perimeter drop rules severed exfiltration channel</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 5. WHICH PARAMETERS ARE IN DANGER */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <div className="flex items-center gap-2">
+                <Sliders className="w-4 h-4 text-[#FF000F]" />
+                <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                  5. Which Parameters are in Danger
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/60 text-[#FF000F] font-mono text-xs font-bold rounded-xs">
+                {current.parametersInDanger.length} Parameters Monitored
+              </span>
+            </div>
+
+            <div className="space-y-3">
+              {current.parametersInDanger.map((param, index) => (
+                <div 
+                  key={index}
+                  className="p-3 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-sm"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#E2E6EA] dark:border-[#282D35]">
+                    <div className="flex items-center gap-2">
+                      <span className={`w-2 h-2 rounded-full ${
+                        param.danger === 'CRITICAL' ? 'bg-[#FF000F] animate-pulse' :
+                        param.danger === 'HIGH' ? 'bg-amber-500' : 'bg-emerald-500'
+                      }`} />
+                      <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">
+                        {param.name}
+                      </h4>
+                    </div>
+                    <span className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded-xs ${
+                      param.danger === 'CRITICAL' ? 'bg-[#FF000F] text-white' :
+                      param.danger === 'HIGH' ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' :
+                      'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+                    }`}>
+                      {param.danger} THREAT
                     </span>
-                    <span className="font-outrun font-bold text-base text-[#FF000F]">94/100</span>
                   </div>
-                  <span className="text-[10px] text-[#868E96] mt-0.5 block">ISO 27035 Cat 1 Emergency</span>
-                </div>
-              </div>
 
-              {/* Box 1: What The Attack Is */}
-              <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
-                  <Flame className="w-4 h-4 text-[#FF000F]" />
-                  <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
-                    WHAT THE ATTACK IS (Threat Vector Analysis)
-                  </h3>
-                </div>
-                <div className="space-y-2 text-xs font-mono">
-                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF]">Primary Vector:</span>
-                    <span className="font-bold text-[#181B1F] dark:text-white text-sm">{current.attackName}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF]">Vulnerability & Exploit:</span>
-                    <span className="font-bold text-[#FF000F]">{current.cve}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF]">MITRE ATT&CK Matrix:</span>
-                    <span className="text-blue-600 dark:text-blue-400 font-bold">{current.attackType}</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF]">Identified Threat Actor Profile:</span>
-                    <span className="text-[#495057] dark:text-[#CBD5E1]">APT-28 / Feodo Botnet Syndicate (Command & Control via Eastern Europe Infrastructure)</span>
-                  </div>
-                  <div className="flex flex-col sm:flex-row sm:items-baseline justify-between gap-1">
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF]">Deep Packet Inspection Trigger:</span>
-                    <span className="text-[#495057] dark:text-[#CBD5E1]">Payload matched signature SID:20243400 (Modbus unauthorized function 0x06 write coil override)</span>
-                  </div>
-                </div>
-              </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2 mt-2.5 text-xs font-mono">
+                    <div className="p-2 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-xs">
+                      <span className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-bold block">Nominal Target Baseline:</span>
+                      <span className="text-emerald-900 dark:text-emerald-200 font-bold">{param.target}</span>
+                    </div>
 
-              {/* Box 2: Which Subnet is Compromised & Compromised Hosts */}
-              <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
-                  <Server className="w-4 h-4 text-[#FF000F]" />
-                  <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
-                    WHICH SUBNET IS COMPROMISED & TARGET ASSETS
-                  </h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs font-mono">
-                  <div className="space-y-2">
-                    <div className="flex justify-between">
-                      <span className="text-[#6C757D] dark:text-[#9BA3AF]">Subnet ID:</span>
-                      <strong className="text-[#181B1F] dark:text-white">{current.name}</strong>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#6C757D] dark:text-[#9BA3AF]">Operational Enclave:</span>
-                      <span className="text-[#495057] dark:text-[#CBD5E1] text-right">{current.role}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#6C757D] dark:text-[#9BA3AF]">VLAN Tag:</span>
-                      <span className="text-[#495057] dark:text-[#CBD5E1]">{current.vlan}</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[#6C757D] dark:text-[#9BA3AF]">Gateway Interface:</span>
-                      <span className="text-[#495057] dark:text-[#CBD5E1]">{current.gateway}</span>
+                    <div className="p-2 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xs">
+                      <span className="text-[10px] text-red-700 dark:text-red-400 uppercase font-bold block">Injected Threat / Danger Value:</span>
+                      <span className="text-red-900 dark:text-red-300 font-bold">{param.current}</span>
                     </div>
                   </div>
 
-                  <div className="space-y-2">
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF] block font-bold">Directly Impacted Hosts:</span>
-                    <div className="space-y-1.5">
-                      {current.compromisedHosts.map((host, i) => (
-                        <div key={i} className="p-2 bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 rounded-xs flex items-center justify-between">
-                          <span className="font-bold text-[#FF000F]">{host}</span>
-                          <span className="text-[10px] uppercase font-bold text-red-700 dark:text-red-400">ISOLATED</span>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Box 3: Effect of Happening (Operational Impact & Blast Radius) */}
-              <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
-                  <Activity className="w-4 h-4 text-[#FF000F]" />
-                  <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
-                    EFFECT OF HAPPENING (Operational Impact & Blast Radius)
-                  </h3>
-                </div>
-                <p className="text-xs text-[#495057] dark:text-[#CBD5E1] leading-relaxed mb-3">
-                  {current.impact}
-                </p>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 font-mono text-xs">
-                  <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
-                    <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] block">Physical Hardware Safety</span>
-                    <strong className="text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">0 Damage • SIL-3 Interlocked</strong>
-                    <span className="text-[10px] text-[#868E96]">Emergency hardware trip prevented overpressure</span>
-                  </div>
-                  <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
-                    <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] block">East-West Blast Radius</span>
-                    <strong className="text-emerald-600 dark:text-emerald-400 text-sm mt-0.5 block">Contained to {current.name.split(' ')[0]}</strong>
-                    <span className="text-[10px] text-[#868E96]">Adjacent Subnets running nominal purple flows</span>
-                  </div>
-                  <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs">
-                    <span className="text-[10px] text-[#6C757D] dark:text-[#9BA3AF] block">Regulatory & Compliance</span>
-                    <strong className="text-amber-600 dark:text-amber-400 text-sm mt-0.5 block">IEC 62443 / ISO 27035</strong>
-                    <span className="text-[10px] text-[#868E96]">Formal SOC Incident Dossier Generated</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* TAB 2: PARAMETERS IN DANGER */}
-          {activeTab === 'parameters' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between pb-2 border-b border-[#E2E6EA] dark:border-[#282D35]">
-                <div>
-                  <h3 className="font-sans font-bold text-base text-[#181B1F] dark:text-white">
-                    Critical Industrial & Operational Parameters in Danger
-                  </h3>
-                  <p className="text-xs text-[#6C757D] dark:text-[#9BA3AF]">
-                    Real-time delta between nominal industrial baselines and unauthorized injected commands.
+                  <p className="text-xs text-[#495057] dark:text-[#CBD5E1] mt-2 font-sans">
+                    <strong>Consequence:</strong> {param.desc}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 bg-red-100 dark:bg-red-950/60 text-[#FF000F] font-mono text-xs font-bold rounded-xs">
-                  {current.parametersInDanger.length} THREAT TARGETS
-                </span>
-              </div>
+              ))}
+            </div>
+          </div>
 
-              <div className="space-y-3">
-                {current.parametersInDanger.map((param, index) => (
-                  <div 
-                    key={index}
-                    className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm hover:border-[#FF000F] transition-colors"
-                  >
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-[#F1F3F5] dark:border-[#282D35]">
-                      <div className="flex items-center gap-2">
-                        <span className={`w-2.5 h-2.5 rounded-full ${
-                          param.danger === 'CRITICAL' ? 'bg-[#FF000F] animate-ping' :
-                          param.danger === 'HIGH' ? 'bg-amber-500' : 'bg-blue-500'
-                        }`} />
-                        <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">
-                          {param.name}
-                        </h4>
-                      </div>
-                      <span className={`px-2 py-0.5 text-[10px] font-mono font-bold uppercase rounded-xs ${
-                        param.danger === 'CRITICAL' ? 'bg-[#FF000F] text-white' :
-                        param.danger === 'HIGH' ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-400' :
-                        'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                      }`}>
-                        {param.danger} THREAT LEVEL
+          {/* 6. DNS MAPPING */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center justify-between pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <div className="flex items-center gap-2">
+                <Globe className="w-4 h-4 text-[#FF000F]" />
+                <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                  6. DNS Mapping
+                </h3>
+              </div>
+              <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-mono text-xs font-bold rounded-xs">
+                SINKHOLE ACTIVE
+              </span>
+            </div>
+
+            <div className="overflow-x-auto border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+              <table className="w-full text-left font-mono text-xs border-collapse">
+                <thead>
+                  <tr className="bg-[#F8F9FA] dark:bg-[#1F242C] border-b border-[#E2E6EA] dark:border-[#282D35] text-[#6C757D] dark:text-[#9BA3AF] text-[11px]">
+                    <th className="p-2.5 font-semibold">QUERIED DOMAIN</th>
+                    <th className="p-2.5 font-semibold">TYPE</th>
+                    <th className="p-2.5 font-semibold">RESOLVED IP</th>
+                    <th className="p-2.5 font-semibold">RESOLVER</th>
+                    <th className="p-2.5 font-semibold">REPUTATION</th>
+                    <th className="p-2.5 font-semibold">SOC ACTION</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E2E6EA] dark:divide-[#282D35]">
+                  {current.dnsMapping.map((dns, index) => {
+                    const isMalicious = dns.reputation.includes('C2') || dns.reputation.includes('PHISHING') || dns.reputation.includes('TUNNELING') || dns.reputation.includes('IoC');
+                    return (
+                      <tr 
+                        key={index}
+                        className={`hover:bg-[#F8F9FA] dark:hover:bg-[#1B2027] transition-colors ${
+                          isMalicious ? 'bg-red-50/40 dark:bg-red-950/20' : ''
+                        }`}
+                      >
+                        <td className="p-2.5 font-bold text-[#181B1F] dark:text-white">
+                          {dns.domain}
+                        </td>
+                        <td className="p-2.5 text-blue-600 dark:text-blue-400 font-bold">
+                          {dns.type}
+                        </td>
+                        <td className="p-2.5 text-[#495057] dark:text-[#CBD5E1]">
+                          {dns.resolvedIp}
+                        </td>
+                        <td className="p-2.5 text-[#6C757D] dark:text-[#9BA3AF]">
+                          {dns.resolver}
+                        </td>
+                        <td className="p-2.5">
+                          <span className={`px-2 py-0.5 rounded-xs text-[10px] font-bold ${
+                            isMalicious 
+                              ? 'bg-red-100 dark:bg-red-950/60 text-[#FF000F]' 
+                              : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
+                          }`}>
+                            {dns.reputation}
+                          </span>
+                        </td>
+                        <td className="p-2.5 font-bold text-emerald-600 dark:text-emerald-400">
+                          {dns.action}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          {/* 7. REMEDIATION */}
+          <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+            <div className="flex items-center gap-2 pb-2 mb-3 border-b border-[#E2E6EA] dark:border-[#282D35]">
+              <ShieldCheck className="w-4 h-4 text-[#FF000F]" />
+              <h3 className="font-sans font-bold text-sm uppercase tracking-wide text-[#181B1F] dark:text-white">
+                7. Remediation
+              </h3>
+            </div>
+
+            <div className="space-y-3">
+              {current.remediationSteps.map((stepItem) => (
+                <div 
+                  key={stepItem.step}
+                  className="p-3 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-xs"
+                >
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 pb-1.5 mb-1.5 border-b border-[#E2E6EA] dark:border-[#282D35]">
+                    <div className="flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-full bg-[#FF000F] text-white font-mono font-bold text-xs flex items-center justify-center shrink-0">
+                        {stepItem.step}
                       </span>
+                      <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">
+                        {stepItem.title}
+                      </h4>
                     </div>
-
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 text-xs font-mono">
-                      <div className="p-2.5 bg-emerald-50 dark:bg-emerald-950/20 border border-emerald-200 dark:border-emerald-900 rounded-xs">
-                        <span className="text-[10px] text-emerald-700 dark:text-emerald-400 uppercase font-bold block">Nominal Baseline Value:</span>
-                        <span className="text-emerald-900 dark:text-emerald-200 font-bold">{param.target}</span>
-                      </div>
-
-                      <div className="p-2.5 bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-900 rounded-xs">
-                        <span className="text-[10px] text-red-700 dark:text-red-400 uppercase font-bold block">Injected Threat / Danger Value:</span>
-                        <span className="text-red-900 dark:text-red-300 font-bold">{param.current}</span>
-                      </div>
-                    </div>
-
-                    <p className="text-xs text-[#495057] dark:text-[#CBD5E1] mt-2.5 font-sans leading-relaxed">
-                      <strong>Analysis:</strong> {param.desc}
-                    </p>
+                    <span className="text-xs font-mono font-bold text-[#FF000F]">
+                      {stepItem.status}
+                    </span>
                   </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* TAB 3: DNS MAPPING & RESOLUTION */}
-          {activeTab === 'dns' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between pb-2 border-b border-[#E2E6EA] dark:border-[#282D35]">
-                <div>
-                  <h3 className="font-sans font-bold text-base text-[#181B1F] dark:text-white">
-                    DNS Threat & Resolution Mapping Table
-                  </h3>
-                  <p className="text-xs text-[#6C757D] dark:text-[#9BA3AF]">
-                    Inbound and outbound DNS queries, authoritative resolvers, and automated sinkholing defenses.
+                  <p className="text-xs text-[#495057] dark:text-[#CBD5E1] pl-7">
+                    {stepItem.action}
                   </p>
                 </div>
-                <span className="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400 font-mono text-xs font-bold rounded-xs">
-                  DNS SINKHOLE ACTIVE
-                </span>
-              </div>
-
-              <div className="overflow-x-auto border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                <table className="w-full text-left font-mono text-xs border-collapse">
-                  <thead>
-                    <tr className="bg-[#F8F9FA] dark:bg-[#1F242C] border-b border-[#E2E6EA] dark:border-[#282D35] text-[#6C757D] dark:text-[#9BA3AF] text-[11px]">
-                      <th className="p-3 font-semibold">QUERIED FQDN / DOMAIN</th>
-                      <th className="p-3 font-semibold">TYPE</th>
-                      <th className="p-3 font-semibold">RESOLVED IP</th>
-                      <th className="p-3 font-semibold">DNS RESOLVER</th>
-                      <th className="p-3 font-semibold">THREAT REPUTATION</th>
-                      <th className="p-3 font-semibold">SOC ACTION</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-[#E2E6EA] dark:divide-[#282D35]">
-                    {current.dnsMapping.map((dns, index) => {
-                      const isMalicious = dns.reputation.includes('C2') || dns.reputation.includes('PHISHING') || dns.reputation.includes('TUNNELING') || dns.reputation.includes('IoC');
-                      return (
-                        <tr 
-                          key={index}
-                          className={`hover:bg-[#F8F9FA] dark:hover:bg-[#1B2027] transition-colors ${
-                            isMalicious ? 'bg-red-50/40 dark:bg-red-950/20' : ''
-                          }`}
-                        >
-                          <td className="p-3 font-bold text-[#181B1F] dark:text-white">
-                            {dns.domain}
-                          </td>
-                          <td className="p-3 text-blue-600 dark:text-blue-400 font-bold">
-                            {dns.type}
-                          </td>
-                          <td className="p-3 text-[#495057] dark:text-[#CBD5E1]">
-                            {dns.resolvedIp}
-                          </td>
-                          <td className="p-3 text-[#6C757D] dark:text-[#9BA3AF]">
-                            {dns.resolver}
-                          </td>
-                          <td className="p-3">
-                            <span className={`px-2 py-0.5 rounded-xs text-[10px] font-bold ${
-                              isMalicious 
-                                ? 'bg-red-100 dark:bg-red-950/60 text-[#FF000F] border border-red-300 dark:border-red-800' 
-                                : 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-400'
-                            }`}>
-                              {dns.reputation}
-                            </span>
-                          </td>
-                          <td className="p-3 font-bold">
-                            <span className="text-emerald-600 dark:text-emerald-400">
-                              {dns.action}
-                            </span>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              <div className="p-3.5 bg-[#F8F9FA] dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm text-xs font-mono text-[#6C757D] dark:text-[#9BA3AF] flex items-center gap-2">
-                <Shield className="w-4 h-4 text-[#FF000F] shrink-0" />
-                <span>
-                  <strong>Recursive DNS Policy Notice:</strong> All endpoints within Subnets A, B, and C are strictly routed through recursive resolver 10.10.0.53 with automated RPZ (Response Policy Zone) sinkholing for known Abuse.ch Feodo and CISA KEV C2 domains.
-                </span>
-              </div>
+              ))}
             </div>
-          )}
-
-          {/* TAB 4: STEP-BY-STEP REMEDIATION */}
-          {activeTab === 'remediation' && (
-            <div className="space-y-4 animate-fadeIn">
-              <div className="flex items-center justify-between pb-2 border-b border-[#E2E6EA] dark:border-[#282D35]">
-                <div>
-                  <h3 className="font-sans font-bold text-base text-[#181B1F] dark:text-white">
-                    Step-by-Step ISO/IEC 27035 Remediation Protocol
-                  </h3>
-                  <p className="text-xs text-[#6C757D] dark:text-[#9BA3AF]">
-                    Prescribed containment, eradication, recovery, and post-incident verification procedures.
-                  </p>
-                </div>
-                <span className="px-2 py-0.5 bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-400 font-mono text-xs font-bold rounded-xs">
-                  PLAYBOOK #ISO-27035-ABB
-                </span>
-              </div>
-
-              <div className="space-y-3">
-                {/* Step 1: Immediate Containment */}
-                <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#F1F3F5] dark:border-[#282D35]">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-[#FF000F] text-white font-mono font-bold text-xs flex items-center justify-center">1</span>
-                      <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">Phase 1: Immediate Network Airgap & Isolation (COMPLETED)</h4>
-                    </div>
-                    <span className="text-emerald-600 dark:text-emerald-400 text-xs font-mono font-bold">Executed in 18s</span>
-                  </div>
-                  <ul className="text-xs text-[#495057] dark:text-[#CBD5E1] space-y-1.5 list-disc list-inside">
-                    <li>Severed logical interface <code className="text-[#FF000F]">{current.gateway}</code> at the boundary Core Gateway.</li>
-                    <li>Injected dynamic firewall rule <code className="text-[#FF000F]">FW-DENY-ALL-{selectedSubnet.toUpperCase()}</code> to stop east-west lateral movement.</li>
-                    <li>Broadcasted DNS RPZ sinkhole rules to isolate compromised IPs from internet C2 callbacks.</li>
-                  </ul>
-                </div>
-
-                {/* Step 2: Host Eradication & Forensics */}
-                <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#F1F3F5] dark:border-[#282D35]">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-mono font-bold text-xs flex items-center justify-center">2</span>
-                      <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">Phase 2: Forensic Capture & Host Eradication (IN PROGRESS)</h4>
-                    </div>
-                    <span className="text-amber-600 dark:text-amber-400 text-xs font-mono font-bold">Active Forensic Lock</span>
-                  </div>
-                  <ul className="text-xs text-[#495057] dark:text-[#CBD5E1] space-y-1.5 list-disc list-inside">
-                    <li>Captured volatile memory snapshot (RAM dump) from {current.compromisedHosts.join(', ')} for reverse malware disassembly.</li>
-                    <li>Terminated unauthorized background daemon processes and revoked Kerberos session tickets.</li>
-                    <li>EDR agent isolated process tree; all non-essential communication blocked.</li>
-                  </ul>
-                </div>
-
-                {/* Step 3: Recovery & Calibration */}
-                <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#F1F3F5] dark:border-[#282D35]">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-mono font-bold text-xs flex items-center justify-center">3</span>
-                      <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">Phase 3: Golden State Recovery & Register Verification (PENDING APPROVAL)</h4>
-                    </div>
-                    <span className="text-[#6C757D] dark:text-[#9BA3AF] text-xs font-mono">Awaiting Lead Approval</span>
-                  </div>
-                  <ul className="text-xs text-[#495057] dark:text-[#CBD5E1] space-y-1.5 list-disc list-inside">
-                    <li>Revert all Modbus Holding Registers (40001, 40105) from cryptographic golden snapshot hash <code className="text-[#FF000F]">#ABB-SNAP-20260910</code>.</li>
-                    <li>Flash certified vendor firmware on PLC controllers to eradicate injected bootkit/rootkit elements.</li>
-                    <li>Conduct multi-point sensor calibration and verify SIL-3 mechanical interlocks.</li>
-                  </ul>
-                </div>
-
-                {/* Step 4: Hardening & Post-Incident */}
-                <div className="p-4 bg-white dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-                  <div className="flex items-center justify-between pb-2 mb-2 border-b border-[#F1F3F5] dark:border-[#282D35]">
-                    <div className="flex items-center gap-2">
-                      <span className="w-6 h-6 rounded-full bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] font-mono font-bold text-xs flex items-center justify-center">4</span>
-                      <h4 className="font-sans font-bold text-sm text-[#181B1F] dark:text-white">Phase 4: Defensive Hardening & Lessons Learned</h4>
-                    </div>
-                    <span className="text-blue-600 dark:text-blue-400 text-xs font-mono font-bold">Planned Post-Recovery</span>
-                  </div>
-                  <ul className="text-xs text-[#495057] dark:text-[#CBD5E1] space-y-1.5 list-disc list-inside">
-                    <li>Deploy vendor emergency patch for {current.cve.split(' ')[0]}.</li>
-                    <li>Enforce mandatory hardware security keys (FIDO2) on all engineering workstations.</li>
-                    <li>Update Suricata and Zeek IDS rulesets across the entire Core Routing Fabric.</li>
-                  </ul>
-                </div>
-              </div>
-            </div>
-          )}
+          </div>
 
         </div>
 
-        {/* Footer Bar */}
-        <div className="p-4 bg-[#F8F9FA] dark:bg-[#1B2027] border-t border-[#E2E6EA] dark:border-[#282D35] flex flex-col sm:flex-row items-center justify-between gap-3 text-xs font-mono text-[#6C757D] dark:text-[#9BA3AF]">
-          <div className="flex items-center gap-3">
-            <span className="font-bold text-[#181B1F] dark:text-white">
-              ABB Industrial Incident Response Protocol
-            </span>
+        {/* Modal Footer */}
+        <div className="p-3 sm:p-4 bg-[#F8F9FA] dark:bg-[#1B2027] border-t border-[#E2E6EA] dark:border-[#282D35] flex items-center justify-between gap-3 text-xs font-mono text-[#6C757D] dark:text-[#9BA3AF] shrink-0">
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-[#181B1F] dark:text-white">ABB Incident Report</span>
             <span>•</span>
-            <span>Ref: {selectedSubnet.toUpperCase()}-INC-2026</span>
-            <span>•</span>
-            <span>Authors: Ishaen S Bethur & Pragyan Hota</span>
+            <span>Ref: {selectedSubnet.toUpperCase()}</span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              onClick={onClose}
-              className="px-4 py-1.5 bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] hover:bg-black font-sans font-bold rounded-sm transition-colors text-xs"
-            >
-              Close Dossier
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="px-4 py-1.5 bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] hover:bg-black font-sans font-bold rounded-sm transition-colors text-xs"
+          >
+            Close Report
+          </button>
         </div>
 
       </div>
