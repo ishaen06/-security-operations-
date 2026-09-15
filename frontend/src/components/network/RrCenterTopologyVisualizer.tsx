@@ -218,6 +218,15 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
   const [incidentId, setIncidentId] = useState<string>('INC-100024');
   const [flowSpeed, setFlowSpeed] = useState<'slow' | 'normal'>('slow');
   const [isRemediating, setIsRemediating] = useState<boolean>(false);
+  const [remediationPhase, setRemediationPhase] = useState<'idle' | 'assigning_ip' | 'reconnecting' | 'restored'>('idle');
+  const [remediationInfo, setRemediationInfo] = useState<{
+    hostname: string;
+    oldIp: string;
+    newIp: string;
+    subnetId: SubnetId;
+    deviceId: string;
+  } | null>(null);
+  const [reconnectingSubnetId, setReconnectingSubnetId] = useState<SubnetId | null>(null);
   const [remediationLog, setRemediationLog] = useState<{
     hostname: string;
     oldIp: string;
@@ -231,10 +240,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
   const subnetReqDur = flowSpeed === 'slow' ? '5.2s' : '2.6s';
   const subnetDataDur = flowSpeed === 'slow' ? '5.8s' : '2.9s';
 
-  // Sequential progression when attack is simulated
+  // Sequential progression when attack is simulated (Steps 1 through 6; Step 7 executes upon remediation)
   useEffect(() => {
     if (!attackedSubnetId) {
-      setResponseStep(0);
+      if (!isRemediating) {
+        setResponseStep(0);
+      }
       return;
     }
 
@@ -245,11 +256,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       setTimeout(() => setResponseStep(4), 1500),
       setTimeout(() => setResponseStep(5), 2100),
       setTimeout(() => setResponseStep(6), 2700),
-      setTimeout(() => setResponseStep(7), 3300),
     ];
 
     return () => timers.forEach(t => clearTimeout(t));
-  }, [attackedSubnetId]);
+  }, [attackedSubnetId, isRemediating]);
 
   const handleSimulateAttack = (subnetId: SubnetId, targetDevice?: VulnerableDevice) => {
     const now = new Date();
@@ -290,6 +300,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
   const handleReset = () => {
     setAttackedSubnetId(null);
     setAttackedDevice(null);
+    setIsRemediating(false);
+    setRemediationPhase('idle');
+    setRemediationInfo(null);
+    setReconnectingSubnetId(null);
     setResponseStep(0);
 
     window.dispatchEvent(new CustomEvent('abb_attack_state', {
@@ -302,7 +316,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     }));
   };
 
-  // Remediation Action: Change device IP address and reconnect to server
+  // Remediation Action: Change device IP address and reconnect to server in the simulation
   const handleRemediate = () => {
     if (!attackedDevice || !attackedSubnetId) {
       handleReset();
@@ -310,31 +324,54 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     }
 
     setIsRemediating(true);
+    setResponseStep(7); // Advance Step 7: REMEDIATION
+
+    const targetSubnet = attackedSubnetId;
+    const targetDevice = attackedDevice;
+    const oldIp = targetDevice.ip;
+    const hostname = targetDevice.hostname;
 
     // Calculate new clean IP address on this subnet
-    const prefix = attackedSubnetId === 'subnet-a' ? '10.10.10.' : attackedSubnetId === 'subnet-b' ? '10.10.20.' : '10.10.30.';
-    const currentSuffix = parseInt(attackedDevice.ip.split('.').pop() || '10', 10);
+    const prefix = targetSubnet === 'subnet-a' ? '10.10.10.' : targetSubnet === 'subnet-b' ? '10.10.20.' : '10.10.30.';
+    const currentSuffix = parseInt(oldIp.split('.').pop() || '10', 10);
     const newSuffix = currentSuffix < 150 ? currentSuffix + 140 : currentSuffix - 50;
     const newIp = `${prefix}${newSuffix}`;
-    const oldIp = attackedDevice.ip;
-    const hostname = attackedDevice.hostname;
 
+    setRemediationInfo({
+      hostname,
+      oldIp,
+      newIp,
+      subnetId: targetSubnet,
+      deviceId: targetDevice.id
+    });
+
+    // PHASE 1: Re-assign IP Lease (DHCP renewal + ARP flush)
+    setRemediationPhase('assigning_ip');
+
+    // PHASE 2 (after 1.3s): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Core Server (10.10.0.1)
     setTimeout(() => {
-      // Reassign IP address of device in subnet state
+      // Reassign IP address of device in subnet state immediately so nodes update
       setSubnets(prev => {
-        const currentSubnet = prev[attackedSubnetId];
+        const currentSubnet = prev[targetSubnet];
         if (!currentSubnet) return prev;
         return {
           ...prev,
-          [attackedSubnetId]: {
+          [targetSubnet]: {
             ...currentSubnet,
             vulnerableDevices: currentSubnet.vulnerableDevices.map(d => 
-              d.id === attackedDevice.id ? { ...d, ip: newIp } : d
+              d.id === targetDevice.id ? { ...d, ip: newIp } : d
             )
           }
         };
       });
 
+      setRemediationPhase('reconnecting');
+      setReconnectingSubnetId(targetSubnet);
+    }, 1300);
+
+    // PHASE 3 (after 3.5s): Server acknowledges reconnection, TLS tunnel active, telemetry restored
+    setTimeout(() => {
+      setRemediationPhase('restored');
       setRemediationLog({
         hostname,
         oldIp,
@@ -345,9 +382,14 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       setIsRemediating(false);
       setAttackedSubnetId(null);
       setAttackedDevice(null);
-      setResponseStep(0);
+      setReconnectingSubnetId(null);
 
-      // Broadcast remediation completion and server reconnection
+      // Reset phase to idle after displaying verification
+      setTimeout(() => {
+        setRemediationPhase('idle');
+      }, 4000);
+
+      // Broadcast remediation completion and server reconnection to global feeds
       window.dispatchEvent(new CustomEvent('abb_attack_state', {
         detail: {
           isAttacking: false,
@@ -358,11 +400,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             hostname,
             oldIp,
             newIp,
-            reconnected: true
+            reconnected: true,
+            serverIp: '10.10.0.1'
           }
         }
       }));
-    }, 600);
+    }, 3600);
   };
 
   const isAttacking = attackedSubnetId !== null;
@@ -397,16 +440,99 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
           <div className="flex items-center gap-3">
             <div 
               className={`px-3 py-2 rounded-sm border flex items-center gap-2 text-xs font-mono font-bold uppercase tracking-wider ${
-                isAttacking
+                isRemediating
+                  ? 'bg-cyan-50 dark:bg-cyan-950/40 border-cyan-500 text-cyan-700 dark:text-cyan-300 shadow-sm animate-pulse'
+                  : isAttacking
                   ? 'bg-red-50 dark:bg-red-950/40 border-[#FF000F] text-[#FF000F] shadow-sm animate-pulse'
                   : 'bg-emerald-50 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
               }`}
             >
-              <span className={`w-2.5 h-2.5 rounded-full ${isAttacking ? 'bg-[#FF000F] animate-ping' : 'bg-emerald-500'}`} />
+              <span className={`w-2.5 h-2.5 rounded-full ${
+                isRemediating 
+                  ? 'bg-cyan-500 animate-ping' 
+                  : isAttacking 
+                  ? 'bg-[#FF000F] animate-ping' 
+                  : 'bg-emerald-500'
+              }`} />
               <span>
-                {isAttacking ? 'THREAT DETECTED — SUBNET ISOLATED' : 'NETWORK STATUS: PROTECTED'}
+                {isRemediating 
+                  ? 'REMEDIATION ACTIVE — RECONNECTING' 
+                  : isAttacking 
+                  ? 'THREAT DETECTED — SUBNET ISOLATED' 
+                  : 'NETWORK STATUS: PROTECTED'}
               </span>
             </div>
+          </div>
+        </div>
+
+        {/* AUTOMATED RESPONSE SEQUENCE PROGRESSION TRACKER - POSITIONED ON TOP OF SIMULATION */}
+        <div className="my-5 p-4 sm:p-5 bg-[#F8F9FA] dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
+            <div className="flex items-center gap-2">
+              <Layers className="w-4 h-4 text-[#FF000F]" />
+              <span className="font-sans font-bold text-xs uppercase tracking-wider text-[#181B1F] dark:text-white">
+                Automated Response Sequence (ABB Adaptive SOC Engine)
+              </span>
+            </div>
+            <span className="text-[10px] font-mono text-[#6C757D] dark:text-[#9BA3AF]">
+              {isRemediating ? (
+                <span className="text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
+                  Step 7 Active: IP Re-assignment & Core Reconnection...
+                </span>
+              ) : isAttacking ? (
+                <span className="text-[#FF000F] font-bold">
+                  Phase {responseStep} of 7 active • Airgap enforced
+                </span>
+              ) : remediationLog ? (
+                <span className="text-emerald-600 dark:text-emerald-400 font-bold">
+                  All 7 Steps Executed • Device Reconnected to Server
+                </span>
+              ) : (
+                'Standing by for telemetry trigger'
+              )}
+            </span>
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
+            {RESPONSE_STEPS.map((step) => {
+              const isRemediationStep = step.id === 7;
+              const isCurrent = (isAttacking && responseStep === step.id) || (isRemediating && isRemediationStep);
+              const isCompleted = (isAttacking && responseStep >= step.id) || (remediationLog && isRemediationStep);
+
+              return (
+                <div
+                  key={step.id}
+                  className={`p-2.5 rounded-sm border transition-all text-left ${
+                    isCurrent
+                      ? isRemediationStep
+                        ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm animate-pulse'
+                        : 'bg-[#FF000F] text-white border-[#FF000F] shadow-sm animate-pulse'
+                      : isCompleted
+                      ? 'bg-white dark:bg-[#16191E] border-emerald-500 text-emerald-700 dark:text-emerald-400'
+                      : 'bg-white/50 dark:bg-[#16191E]/50 border-[#E2E6EA] dark:border-[#282D35] text-[#868E96]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-[9px] font-mono font-bold">
+                      STEP 0{step.id}
+                    </span>
+                    {isCompleted && !isCurrent && (
+                      <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+                    )}
+                  </div>
+                  <div className="text-[11px] font-sans font-bold truncate">
+                    {step.label}
+                  </div>
+                  <div className={`text-[9px] truncate mt-0.5 ${isCurrent ? 'text-white/90' : 'text-[#6C757D]'}`}>
+                    {isRemediationStep && isRemediating 
+                      ? remediationPhase === 'assigning_ip' 
+                        ? 'Re-assigning IP address...' 
+                        : 'Reconnecting to server...' 
+                      : step.desc}
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
 
@@ -445,14 +571,56 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
         {/* Interactive Network Topology Map */}
         <div className="relative bg-[#FAFBFD] dark:bg-[#12151A] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm p-6 sm:p-8 overflow-hidden">
         
+        {/* Real-time Remediation Simulation Overlay HUD */}
+        {isRemediating && remediationInfo && (
+          <div className="mb-5 p-3.5 bg-gradient-to-r from-[#181B1F] via-[#1E242E] to-[#181B1F] text-white rounded-sm border-2 border-cyan-500 shadow-xl flex items-center justify-between gap-3 text-xs font-mono animate-fadeIn">
+            <div className="flex items-center gap-3">
+              <div className="w-3.5 h-3.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
+              <div>
+                <div className="font-bold text-cyan-400 flex items-center gap-2 text-xs">
+                  <span>LIVE REMEDIATION SIMULATION ACTIVE</span>
+                  <span className="text-[9px] px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-700 rounded-xs font-bold uppercase tracking-wider">
+                    {remediationPhase === 'assigning_ip' ? 'Phase 1: Dynamic IP Re-assignment' : 'Phase 2: Core Server Reconnection'}
+                  </span>
+                </div>
+                <div className="text-gray-300 text-[11px] mt-0.5">
+                  {remediationPhase === 'assigning_ip' && (
+                    <span>
+                      Allocating clean DHCP IP lease for <strong>{remediationInfo.hostname}</strong>: changing IP from <span className="line-through text-red-400 font-bold">{remediationInfo.oldIp}</span> to <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 py-0.2 rounded-xs">{remediationInfo.newIp}</span> and flushing local ARP cache...
+                    </span>
+                  )}
+                  {remediationPhase === 'reconnecting' && (
+                    <span>
+                      Establishing mutual TLS 1.3 cryptographic session from newly assigned IP <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 py-0.2 rounded-xs">{remediationInfo.newIp}</span> through Gateway to Primary Core Host <strong>10.10.0.1</strong>...
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="text-right shrink-0">
+              <span className="px-2 py-1 bg-cyan-900/80 text-cyan-200 rounded-xs text-[10px] font-bold border border-cyan-600">
+                {remediationPhase === 'assigning_ip' ? 'STEP 1: IP ROTATION' : 'STEP 2: TLS HANDSHAKE'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {/* Topology Diagram Container */}
         <div className="max-w-4xl mx-auto flex flex-col items-center">
           
           {/* LEVEL 1: Central Primary Core Host */}
           <div className="relative z-10 w-full max-w-md">
-            <div className="p-4 bg-white dark:bg-[#1B2027] border-2 border-[#181B1F] dark:border-white rounded-sm shadow-md flex items-center justify-between gap-4">
+            <div className={`p-4 bg-white dark:bg-[#1B2027] border-2 rounded-sm shadow-md flex items-center justify-between gap-4 transition-all ${
+              remediationPhase === 'reconnecting' 
+                ? 'border-cyan-500 ring-2 ring-cyan-500/30' 
+                : 'border-[#181B1F] dark:border-white'
+            }`}>
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F] rounded-xs flex items-center justify-center font-bold">
+                <div className={`w-10 h-10 rounded-xs flex items-center justify-center font-bold ${
+                  remediationPhase === 'reconnecting'
+                    ? 'bg-cyan-600 text-white animate-pulse'
+                    : 'bg-[#181B1F] text-white dark:bg-white dark:text-[#181B1F]'
+                }`}>
                   <Server className="w-5 h-5" />
                 </div>
                 <div>
@@ -469,25 +637,49 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
               </div>
 
               <div className="text-right font-mono text-xs">
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                  ONLINE
-                </span>
-                <div className="text-[10px] text-[#6C757D]">Uptime: 99.999%</div>
+                {remediationPhase === 'reconnecting' ? (
+                  <span className="inline-flex items-center gap-1 text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
+                    <span className="w-2 h-2 rounded-full bg-cyan-500 animate-ping" />
+                    HANDSHAKE: {remediationInfo?.newIp}
+                  </span>
+                ) : remediationPhase === 'restored' || remediationLog ? (
+                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500" />
+                    ONLINE (TLS RESTORED)
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold">
+                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                    ONLINE
+                  </span>
+                )}
+                <div className="text-[10px] text-[#6C757D]">
+                  {remediationPhase === 'reconnecting' ? 'Verifying 10.10.0.1 Reconnect' : 'Uptime: 99.999%'}
+                </div>
               </div>
             </div>
           </div>
 
-          {/* Connection Line 1: Core Host to Gateway with Request & Data Flow */}
+          {/* Connection Line 1: Core Host to Gateway with Request, Data, and Reconnection Flows */}
           <div className="w-full max-w-sm h-14 relative flex items-center justify-center my-0.5">
             <svg className="w-48 h-full" viewBox="0 0 160 56">
               <defs>
                 <path id="trunk-req-path" d="M 65 0 L 65 56" fill="none" />
                 <path id="trunk-data-path" d="M 95 56 L 95 0" fill="none" />
+                <path id="trunk-reconn-path" d="M 80 56 L 80 0" fill="none" />
               </defs>
 
               {/* Physical conduit line tracks */}
               <line x1="65" y1="0" x2="65" y2="56" stroke="#CBD5E1" strokeWidth="2" strokeDasharray="3 3" />
+              <line 
+                x1="80" 
+                y1="0" 
+                x2="80" 
+                y2="56" 
+                stroke={remediationPhase === 'reconnecting' ? '#00D2FF' : 'transparent'} 
+                strokeWidth={remediationPhase === 'reconnecting' ? '2.5' : '1'} 
+                strokeDasharray={remediationPhase === 'reconnecting' ? '4 2' : 'none'}
+              />
               <line x1="95" y1="0" x2="95" y2="56" stroke="#CBD5E1" strokeWidth="2" strokeDasharray="3 3" />
 
               {/* Downstream Request Packet (ABB Electric Lilac #615eef) */}
@@ -517,15 +709,39 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                   </animateMotion>
                 </circle>
               </g>
+
+              {/* Upstream Reconnection TLS Handshake Packet (Cyan #00D2FF) */}
+              {remediationPhase === 'reconnecting' && (
+                <g>
+                  <circle r="9" fill="#00D2FF" opacity="0.5">
+                    <animateMotion dur="1.1s" repeatCount="indefinite">
+                      <mpath href="#trunk-reconn-path" />
+                    </animateMotion>
+                  </circle>
+                  <circle r="4.5" fill="#00D2FF">
+                    <animateMotion dur="1.1s" repeatCount="indefinite">
+                      <mpath href="#trunk-reconn-path" />
+                    </animateMotion>
+                  </circle>
+                </g>
+              )}
             </svg>
 
             {/* Micro indicators alongside conduit */}
-            <div className="absolute left-1/2 -translate-x-20 text-[9px] font-mono font-bold text-[#615eef] flex items-center gap-0.5">
-              <span>↓ REQ</span>
-            </div>
-            <div className="absolute left-1/2 translate-x-12 text-[9px] font-mono font-bold text-[#9061F9] flex items-center gap-0.5">
-              <span>↑ DATA</span>
-            </div>
+            {remediationPhase === 'reconnecting' ? (
+              <div className="absolute left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-1 animate-pulse bg-white/90 dark:bg-black/90 px-2 py-0.5 rounded-xs border border-cyan-500 shadow-sm">
+                <span>↑ RECONNECTING NEW IP ({remediationInfo?.newIp}) TO CORE 10.10.0.1</span>
+              </div>
+            ) : (
+              <>
+                <div className="absolute left-1/2 -translate-x-20 text-[9px] font-mono font-bold text-[#615eef] flex items-center gap-0.5">
+                  <span>↓ REQ</span>
+                </div>
+                <div className="absolute left-1/2 translate-x-12 text-[9px] font-mono font-bold text-[#9061F9] flex items-center gap-0.5">
+                  <span>↑ DATA</span>
+                </div>
+              </>
+            )}
           </div>
 
           {/* LEVEL 2: Secure Network Gateway / Firewall */}
@@ -564,6 +780,11 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 <path id="path-data-b" d="M 405 84 L 405 0" fill="none" />
                 <path id="path-data-c" d="M 657 84 L 657 36 L 404 36 L 404 0" fill="none" />
 
+                {/* Upstream Reconnection TLS Handshake Paths (from Subnets to Gateway) */}
+                <path id="path-reconn-a" d="M 133 84 L 133 28 L 400 28 L 400 0" fill="none" />
+                <path id="path-reconn-b" d="M 400 84 L 400 0" fill="none" />
+                <path id="path-reconn-c" d="M 667 84 L 667 28 L 400 28 L 400 0" fill="none" />
+
                 {/* Attack Exploit Path (Stops at isolation barrier at y=36) */}
                 <path id="path-atk-a" d="M 390 0 L 390 28 L 133 28 L 133 38" fill="none" />
                 <path id="path-atk-b" d="M 395 0 L 395 38" fill="none" />
@@ -582,9 +803,15 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 y1="32" 
                 x2="133" 
                 y2="84" 
-                stroke={attackedSubnetId === 'subnet-a' ? '#FF000F' : '#CED4DA'} 
-                strokeWidth={attackedSubnetId === 'subnet-a' ? '3' : '2'}
-                strokeDasharray={attackedSubnetId === 'subnet-a' ? '6 4' : 'none'}
+                stroke={
+                  reconnectingSubnetId === 'subnet-a'
+                    ? '#00D2FF'
+                    : attackedSubnetId === 'subnet-a'
+                    ? '#FF000F'
+                    : '#CED4DA'
+                } 
+                strokeWidth={reconnectingSubnetId === 'subnet-a' || attackedSubnetId === 'subnet-a' ? '3' : '2'}
+                strokeDasharray={reconnectingSubnetId === 'subnet-a' ? '4 2' : attackedSubnetId === 'subnet-a' ? '6 4' : 'none'}
               />
 
               {/* Branch to Subnet B */}
@@ -593,9 +820,15 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 y1="32" 
                 x2="400" 
                 y2="84" 
-                stroke={attackedSubnetId === 'subnet-b' ? '#FF000F' : '#CED4DA'} 
-                strokeWidth={attackedSubnetId === 'subnet-b' ? '3' : '2'}
-                strokeDasharray={attackedSubnetId === 'subnet-b' ? '6 4' : 'none'}
+                stroke={
+                  reconnectingSubnetId === 'subnet-b'
+                    ? '#00D2FF'
+                    : attackedSubnetId === 'subnet-b'
+                    ? '#FF000F'
+                    : '#CED4DA'
+                } 
+                strokeWidth={reconnectingSubnetId === 'subnet-b' || attackedSubnetId === 'subnet-b' ? '3' : '2'}
+                strokeDasharray={reconnectingSubnetId === 'subnet-b' ? '4 2' : attackedSubnetId === 'subnet-b' ? '6 4' : 'none'}
               />
 
               {/* Branch to Subnet C */}
@@ -604,9 +837,15 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 y1="32" 
                 x2="667" 
                 y2="84" 
-                stroke={attackedSubnetId === 'subnet-c' ? '#FF000F' : '#CED4DA'} 
-                strokeWidth={attackedSubnetId === 'subnet-c' ? '3' : '2'}
-                strokeDasharray={attackedSubnetId === 'subnet-c' ? '6 4' : 'none'}
+                stroke={
+                  reconnectingSubnetId === 'subnet-c'
+                    ? '#00D2FF'
+                    : attackedSubnetId === 'subnet-c'
+                    ? '#FF000F'
+                    : '#CED4DA'
+                } 
+                strokeWidth={reconnectingSubnetId === 'subnet-c' || attackedSubnetId === 'subnet-c' ? '3' : '2'}
+                strokeDasharray={reconnectingSubnetId === 'subnet-c' ? '4 2' : attackedSubnetId === 'subnet-c' ? '6 4' : 'none'}
               />
 
               {/* =================================================== */}
@@ -642,6 +881,20 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                     </circle>
                   </g>
                 </>
+              ) : reconnectingSubnetId === 'subnet-a' ? (
+                /* Reconnection Handshake Packet (Cyan #00D2FF) */
+                <g>
+                  <circle r="9" fill="#00D2FF" opacity="0.5">
+                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                      <mpath href="#path-reconn-a" />
+                    </animateMotion>
+                  </circle>
+                  <circle r="4.5" fill="#00D2FF">
+                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                      <mpath href="#path-reconn-a" />
+                    </animateMotion>
+                  </circle>
+                </g>
               ) : (
                 /* Attack Exploit Packet Blocked at Junction */
                 <g>
@@ -691,6 +944,20 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                     </circle>
                   </g>
                 </>
+              ) : reconnectingSubnetId === 'subnet-b' ? (
+                /* Reconnection Handshake Packet (Cyan #00D2FF) */
+                <g>
+                  <circle r="9" fill="#00D2FF" opacity="0.5">
+                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                      <mpath href="#path-reconn-b" />
+                    </animateMotion>
+                  </circle>
+                  <circle r="4.5" fill="#00D2FF">
+                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                      <mpath href="#path-reconn-b" />
+                    </animateMotion>
+                  </circle>
+                </g>
               ) : (
                 /* Attack Exploit Packet Blocked at Junction */
                 <g>
@@ -740,6 +1007,20 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                     </circle>
                   </g>
                 </>
+              ) : reconnectingSubnetId === 'subnet-c' ? (
+                /* Reconnection Handshake Packet (Cyan #00D2FF) */
+                <g>
+                  <circle r="9" fill="#00D2FF" opacity="0.5">
+                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                      <mpath href="#path-reconn-c" />
+                    </animateMotion>
+                  </circle>
+                  <circle r="4.5" fill="#00D2FF">
+                    <animateMotion dur="1.2s" repeatCount="indefinite">
+                      <mpath href="#path-reconn-c" />
+                    </animateMotion>
+                  </circle>
+                </g>
               ) : (
                 /* Attack Exploit Packet Blocked at Junction */
                 <g>
@@ -757,8 +1038,8 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
               )}
             </svg>
 
-            {/* Isolation Badge on Attack Link */}
-            {attackedSubnetId && (
+            {/* Dynamic Status Badges along Conduit */}
+            {attackedSubnetId && !reconnectingSubnetId && !isRemediating && (
               <div 
                 className="absolute top-8 -translate-x-1/2 z-20 px-2.5 py-1 bg-[#FF000F] text-white text-[9px] font-mono font-bold rounded-xs shadow-md flex items-center gap-1.5 animate-bounce border border-white dark:border-black"
                 style={{
@@ -767,6 +1048,45 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
               >
                 <Lock className="w-3 h-3" />
                 <span>LINK SEVERED • AIRGAP ACTIVE</span>
+              </div>
+            )}
+
+            {/* Phase 1 Badge: Reassigning IP */}
+            {remediationPhase === 'assigning_ip' && remediationInfo && (
+              <div 
+                className="absolute top-8 -translate-x-1/2 z-20 px-2.5 py-1 bg-amber-500 text-white text-[9px] font-mono font-bold rounded-xs shadow-md flex items-center gap-1.5 animate-pulse border border-white"
+                style={{
+                  left: remediationInfo.subnetId === 'subnet-a' ? '16.6%' : remediationInfo.subnetId === 'subnet-b' ? '50%' : '83.3%'
+                }}
+              >
+                <RotateCcw className="w-3 h-3 animate-spin" />
+                <span>ROTATING IP: {remediationInfo.oldIp} → {remediationInfo.newIp}</span>
+              </div>
+            )}
+
+            {/* Phase 2 Badge: Reconnecting to Server */}
+            {remediationPhase === 'reconnecting' && remediationInfo && (
+              <div 
+                className="absolute top-8 -translate-x-1/2 z-20 px-2.5 py-1 bg-cyan-600 text-white text-[9px] font-mono font-bold rounded-xs shadow-md flex items-center gap-1.5 animate-pulse border border-white"
+                style={{
+                  left: remediationInfo.subnetId === 'subnet-a' ? '16.6%' : remediationInfo.subnetId === 'subnet-b' ? '50%' : '83.3%'
+                }}
+              >
+                <span className="w-2 h-2 rounded-full bg-cyan-300 animate-ping" />
+                <span>TLS HANDSHAKE: RECONNECTING {remediationInfo.newIp} → 10.10.0.1</span>
+              </div>
+            )}
+
+            {/* Phase 3 Badge: Restored */}
+            {remediationPhase === 'restored' && remediationInfo && (
+              <div 
+                className="absolute top-8 -translate-x-1/2 z-20 px-2.5 py-1 bg-emerald-600 text-white text-[9px] font-mono font-bold rounded-xs shadow-md flex items-center gap-1.5 border border-white"
+                style={{
+                  left: remediationInfo.subnetId === 'subnet-a' ? '16.6%' : remediationInfo.subnetId === 'subnet-b' ? '50%' : '83.3%'
+                }}
+              >
+                <CheckCircle2 className="w-3 h-3" />
+                <span>RECONNECTED • IP {remediationInfo.newIp} VERIFIED</span>
               </div>
             )}
           </div>
@@ -873,13 +1193,22 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                       <div className="space-y-2">
                         {subnet.vulnerableDevices.map((dev) => {
                           const isDevAttacked = isCompromised && attackedDevice?.id === dev.id;
+                          const isDevRemediating = isRemediating && remediationInfo?.deviceId === dev.id;
+                          const isDevRecentlyRemediated = remediationLog?.hostname === dev.hostname;
+
                           return (
                             <div
                               key={dev.id}
                               onClick={(e) => e.stopPropagation()}
                               className={`p-2.5 rounded-xs border transition-all ${
-                                isDevAttacked
+                                isDevRemediating
+                                  ? remediationPhase === 'assigning_ip'
+                                    ? 'bg-amber-50/90 dark:bg-amber-950/50 border-amber-500 ring-2 ring-amber-500/50 shadow-sm animate-pulse'
+                                    : 'bg-cyan-50/90 dark:bg-cyan-950/50 border-cyan-500 ring-2 ring-cyan-500/50 shadow-sm animate-pulse'
+                                  : isDevAttacked
                                   ? 'bg-red-100/90 dark:bg-red-950/50 border-[#FF000F] ring-1 ring-[#FF000F] shadow-sm animate-pulse'
+                                  : isDevRecentlyRemediated
+                                  ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-500 ring-1 ring-emerald-500/40'
                                   : isCompromised
                                   ? 'bg-white/70 dark:bg-[#14181F]/70 border-emerald-300 dark:border-emerald-800'
                                   : 'bg-[#F8F9FA] dark:bg-[#14181F] border-[#E2E6EA] dark:border-[#262C36] hover:border-[#ADB5BD]'
@@ -888,13 +1217,58 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                               <div className="flex items-start justify-between gap-1.5">
                                 <div className="min-w-0 flex-1">
                                   <div className="flex items-center gap-1.5">
-                                    <span className={`w-1.5 h-1.5 rounded-full ${isDevAttacked ? 'bg-[#FF000F] animate-ping' : 'bg-amber-500'}`} />
+                                    <span className={`w-1.5 h-1.5 rounded-full ${
+                                      isDevRemediating 
+                                        ? remediationPhase === 'assigning_ip' ? 'bg-amber-500 animate-ping' : 'bg-cyan-400 animate-ping'
+                                        : isDevAttacked 
+                                        ? 'bg-[#FF000F] animate-ping' 
+                                        : isDevRecentlyRemediated 
+                                        ? 'bg-emerald-500' 
+                                        : 'bg-amber-500'
+                                    }`} />
                                     <span className="font-mono font-bold text-xs text-[#181B1F] dark:text-white truncate">
                                       {dev.hostname}
                                     </span>
+                                    {isDevRemediating && (
+                                      <span className={`text-[8px] font-mono px-1 py-0.2 rounded-xs font-bold uppercase tracking-wider ${
+                                        remediationPhase === 'assigning_ip' 
+                                          ? 'bg-amber-200 dark:bg-amber-900 text-amber-800 dark:text-amber-200 animate-pulse' 
+                                          : 'bg-cyan-200 dark:bg-cyan-900 text-cyan-800 dark:text-cyan-200 animate-pulse'
+                                      }`}>
+                                        {remediationPhase === 'assigning_ip' ? 'Rotating IP' : 'TLS Handshake'}
+                                      </span>
+                                    )}
+                                    {isDevRecentlyRemediated && (
+                                      <span className="text-[8px] font-mono px-1 py-0.2 rounded-xs font-bold uppercase bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300">
+                                        Reconnected
+                                      </span>
+                                    )}
                                   </div>
+
+                                  {/* Dynamic IP Address Display */}
                                   <div className="text-[10px] font-mono text-[#6C757D] dark:text-[#9BA3AF] mt-0.5">
-                                    {dev.ip} • <span className="text-[#495057] dark:text-[#CBD5E1]">{dev.port}</span>
+                                    {isDevRemediating && remediationPhase === 'assigning_ip' && remediationInfo ? (
+                                      <div className="flex items-center gap-1 font-bold">
+                                        <span className="line-through text-red-500">{remediationInfo.oldIp}</span>
+                                        <span className="text-amber-600">→</span>
+                                        <span className="text-emerald-600 dark:text-emerald-400 animate-pulse">{remediationInfo.newIp}</span>
+                                        <span className="text-[#868E96]">• {dev.port}</span>
+                                      </div>
+                                    ) : isDevRemediating && remediationPhase === 'reconnecting' ? (
+                                      <div className="text-cyan-600 dark:text-cyan-400 font-bold flex items-center gap-1">
+                                        <span>{dev.ip}</span>
+                                        <span>• Connecting to 10.10.0.1</span>
+                                      </div>
+                                    ) : isDevRecentlyRemediated ? (
+                                      <div>
+                                        <span className="font-bold text-emerald-600 dark:text-emerald-400">{dev.ip}</span>
+                                        <span className="text-[#6C757D]"> (New IP) • {dev.port}</span>
+                                      </div>
+                                    ) : (
+                                      <div>
+                                        {dev.ip} • <span className="text-[#495057] dark:text-[#CBD5E1]">{dev.port}</span>
+                                      </div>
+                                    )}
                                   </div>
                                 </div>
 
@@ -911,30 +1285,47 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                                 {dev.vulnerability}
                               </div>
 
-                              {/* Interactive Attack Trigger Button */}
+                              {/* Interactive Attack & Remediation Trigger Buttons */}
                               <div className="mt-2 pt-1.5 border-t border-[#E9ECEF] dark:border-[#262C36] flex items-center justify-between">
                                 <span className="text-[9px] font-mono text-[#6C757D]">
-                                  {isDevAttacked ? (
+                                  {isDevRemediating ? (
+                                    <span className="text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">● REMEDIATING</span>
+                                  ) : isDevAttacked ? (
                                     <span className="text-[#FF000F] font-bold">● EXPLOITED</span>
                                   ) : isCompromised ? (
                                     <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ AIRGAPPED</span>
+                                  ) : isDevRecentlyRemediated ? (
+                                    <span className="text-emerald-600 dark:text-emerald-400 font-bold">✓ ONLINE</span>
                                   ) : (
                                     <span>Vec: {dev.attackVector}</span>
                                   )}
                                 </span>
 
                                 {isDevAttacked ? (
-                                  <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleReset();
-                                    }}
-                                    className="px-2 py-0.5 text-[9px] font-mono font-bold bg-[#181B1F] text-white hover:bg-black rounded-xs transition-colors flex items-center gap-1 cursor-pointer"
-                                    title="Neutralize threat and restore baseline"
-                                  >
-                                    <RotateCcw className="w-2.5 h-2.5" />
-                                    <span>Neutralize</span>
-                                  </button>
+                                  <div className="flex items-center gap-1.5">
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleRemediate();
+                                      }}
+                                      disabled={isRemediating}
+                                      className="px-2 py-0.5 text-[9px] font-mono font-bold bg-[#FF000F] hover:bg-[#D9000D] text-white rounded-xs transition-colors flex items-center gap-1 cursor-pointer disabled:opacity-50 shadow-xs"
+                                      title="Change device IP and reconnect to Core Server (10.10.0.1)"
+                                    >
+                                      <RotateCcw className={`w-2.5 h-2.5 ${isRemediating ? 'animate-spin' : ''}`} />
+                                      <span>{isRemediating ? 'Reconnecting...' : 'Remediate (Change IP)'}</span>
+                                    </button>
+                                    <button
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        handleReset();
+                                      }}
+                                      className="px-1.5 py-0.5 text-[9px] font-mono font-bold bg-[#181B1F] text-white hover:bg-black rounded-xs transition-colors flex items-center gap-1 cursor-pointer"
+                                      title="Neutralize threat"
+                                    >
+                                      <span>Reset</span>
+                                    </button>
+                                  </div>
                                 ) : (
                                   <button
                                     onClick={(e) => {
@@ -1079,57 +1470,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
           </div>
         </div>
 
-        {/* AUTOMATED RESPONSE SEQUENCE PROGRESSION TRACKER */}
-      <div className="p-4 sm:p-5 bg-[#F8F9FA] dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Layers className="w-4 h-4 text-[#FF000F]" />
-            <span className="font-sans font-bold text-xs uppercase tracking-wider text-[#181B1F] dark:text-white">
-              Automated Response Sequence (ABB Adaptive SOC Engine)
-            </span>
-          </div>
-          <span className="text-[10px] font-mono text-[#6C757D]">
-            {isAttacking ? `Phase ${responseStep} of 7 active` : 'Standing by for telemetry trigger'}
-          </span>
-        </div>
-
-        <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2">
-          {RESPONSE_STEPS.map((step) => {
-            const isCompleted = isAttacking && responseStep >= step.id;
-            const isCurrent = isAttacking && responseStep === step.id;
-
-            return (
-              <div
-                key={step.id}
-                className={`p-2.5 rounded-sm border transition-all text-left ${
-                  isCurrent
-                    ? 'bg-[#FF000F] text-white border-[#FF000F] shadow-sm animate-pulse'
-                    : isCompleted
-                    ? 'bg-white dark:bg-[#16191E] border-emerald-500 text-emerald-700 dark:text-emerald-400'
-                    : 'bg-white/50 dark:bg-[#16191E]/50 border-[#E2E6EA] dark:border-[#282D35] text-[#868E96]'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-1">
-                  <span className="text-[9px] font-mono font-bold">
-                    STEP 0{step.id}
-                  </span>
-                  {isCompleted && !isCurrent && (
-                    <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-                  )}
-                </div>
-                <div className="text-[11px] font-sans font-bold truncate">
-                  {step.label}
-                </div>
-                <div className={`text-[9px] truncate mt-0.5 ${isCurrent ? 'text-white/80' : 'text-[#6C757D]'}`}>
-                  {step.desc}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* SECURITY EVENT PANEL (Visible when attack is simulated) */}
+        {/* SECURITY EVENT PANEL (Visible when attack is simulated) */}
       {isAttacking && (
         <div className="p-5 bg-white dark:bg-[#16191E] border-2 border-[#FF000F] rounded-sm shadow-md animate-fadeIn">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-3 mb-4 border-b border-[#E2E6EA] dark:border-[#282D35] gap-2">
