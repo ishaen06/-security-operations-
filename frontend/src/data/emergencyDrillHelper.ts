@@ -97,7 +97,7 @@ export function generateClientSidePacket(counter: number): TrafficPacket {
     const c2 = c2List[Math.floor(Math.random() * c2List.length)];
     const internalIp = internalIps[Math.floor(Math.random() * internalIps.length)];
     return {
-      id: `PKT-LIVE-${String(counter).padStart(5, '0')}`,
+      id: `PKT-LIVE-${String(counter).padStart(5, '0')}-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 899 + 100)}`,
       timestamp: now,
       src_ip: internalIp,
       dst_ip: c2.ip_address,
@@ -120,7 +120,7 @@ export function generateClientSidePacket(counter: number): TrafficPacket {
     const action = proto === 'MODBUS/TCP' || proto === 'IEC-104' ? 'ALLOW' : (Math.random() < 0.88 ? 'ALLOW' : 'DROP');
 
     return {
-      id: `PKT-LIVE-${String(counter).padStart(5, '0')}`,
+      id: `PKT-LIVE-${String(counter).padStart(5, '0')}-${Date.now().toString().slice(-4)}-${Math.floor(Math.random() * 899 + 100)}`,
       timestamp: now,
       src_ip: src,
       dst_ip: dst,

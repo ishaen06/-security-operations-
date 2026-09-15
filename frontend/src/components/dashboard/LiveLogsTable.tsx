@@ -39,10 +39,12 @@ export const LiveLogsTable: React.FC = () => {
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
 
   const packetCounterRef = useRef<number>(25);
+  const isSyncingRef = useRef<boolean>(false);
+  const lastManualSyncRef = useRef<number>(0);
+  const noticeTimeoutRef = useRef<any>(null);
 
-  // Function to trigger the 3-minute log data refresh
-  const triggerThreeMinuteRefresh = async () => {
-    setIsSyncing(true);
+  // Stable batch ingestion function
+  const ingestBatch = () => {
     const now = new Date();
     const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} UTC`;
 
@@ -56,22 +58,41 @@ export const LiveLogsTable: React.FC = () => {
     setPackets((prev) => [...prev.slice(-125), ...freshBatch]);
     setLastRefreshedTime(timeStr);
     setCountdownSeconds(180);
-    setRefreshNotice('3-Minute Cycle Complete: +25 fresh network telemetry logs committed');
 
-    // Notify backend sync endpoint if online
+    if (noticeTimeoutRef.current) {
+      clearTimeout(noticeTimeoutRef.current);
+    }
+    setRefreshNotice('3-Minute Cycle Complete: +25 fresh network telemetry logs committed');
+    noticeTimeoutRef.current = setTimeout(() => {
+      setRefreshNotice(null);
+    }, 4000);
+  };
+
+  // User click handler for "Sync Logs" button
+  const handleManualSync = async () => {
+    if (isSyncingRef.current) return;
+    isSyncingRef.current = true;
+    setIsSyncing(true);
+    lastManualSyncRef.current = Date.now();
+
+    // Trigger local batch ingestion immediately
+    ingestBatch();
+
+    // Notify backend sync endpoint in background without blocking or re-triggering
     try {
-      await fetch('http://localhost:5000/api/v1/emergency/force-sync', { method: 'POST' });
+      await fetch('http://localhost:5000/api/v1/emergency/force-sync', { 
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
     } catch {
       // Backend offline fallback handled cleanly
     }
 
+    // Stable, smooth transition without UI jumping
     setTimeout(() => {
       setIsSyncing(false);
+      isSyncingRef.current = false;
     }, 600);
-
-    setTimeout(() => {
-      setRefreshNotice(null);
-    }, 4500);
   };
 
   // 3-minute countdown timer (ticks every second)
@@ -79,7 +100,7 @@ export const LiveLogsTable: React.FC = () => {
     const timer = setInterval(() => {
       setCountdownSeconds((prev) => {
         if (prev <= 1) {
-          triggerThreeMinuteRefresh();
+          setTimeout(() => ingestBatch(), 0);
           return 180;
         }
         return prev - 1;
@@ -88,7 +109,7 @@ export const LiveLogsTable: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // Listen for backend 3-minute batch update events (strictly no live per-second streaming)
+  // Listen for backend 3-minute batch update events (ignoring manual echo to prevent glitch loops)
   useEffect(() => {
     let eventSource: EventSource | null = null;
 
@@ -100,7 +121,11 @@ export const LiveLogsTable: React.FC = () => {
           const parsed = JSON.parse(event.data);
           // Strictly only ingest batches on the 3-minute recurring cycle
           if (parsed.type === '3_MINUTE_DATA_UPDATE') {
-            triggerThreeMinuteRefresh();
+            // Ignore echo if manual sync was executed in the last 4 seconds
+            if (Date.now() - lastManualSyncRef.current < 4000) {
+              return;
+            }
+            ingestBatch();
           }
         } catch {
           // ignore
@@ -119,6 +144,7 @@ export const LiveLogsTable: React.FC = () => {
 
     return () => {
       if (eventSource) eventSource.close();
+      if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
     };
   }, []);
 
@@ -209,15 +235,15 @@ export const LiveLogsTable: React.FC = () => {
             </div>
           </div>
 
-          {/* Sync Now Button */}
+          {/* Sync Now Button - Stable dimensions, no width-jumping or glitching */}
           <button
-            onClick={triggerThreeMinuteRefresh}
+            onClick={handleManualSync}
             disabled={isSyncing}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-[#181B1F] text-white hover:bg-black rounded-sm text-xs font-mono font-bold uppercase transition-all shadow-xs disabled:opacity-60"
+            className="flex items-center justify-center gap-1.5 w-28 px-3 py-1.5 bg-[#181B1F] text-white hover:bg-black rounded-sm text-xs font-mono font-bold uppercase transition-all shadow-xs disabled:opacity-75 cursor-pointer disabled:cursor-not-allowed select-none"
             title="Force immediate 3-minute log batch ingestion"
           >
-            <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-[#FF000F]' : ''}`} />
-            <span>{isSyncing ? 'Syncing...' : 'Sync Logs'}</span>
+            <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isSyncing ? 'animate-spin text-[#FF000F]' : ''}`} />
+            <span className="truncate">{isSyncing ? 'Syncing...' : 'Sync Logs'}</span>
           </button>
 
           {/* Download Logs Button - Clean & borderless */}
