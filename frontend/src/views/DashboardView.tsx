@@ -77,7 +77,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               </strong>
             </div>
             <p className="text-[#495057] dark:text-[#CBD5E1] mt-1 font-mono text-[11px]">
-              Real-world CISA KEV CVE-2024-3400 + Abuse.ch Feodo Botnet C2 injected into incident queue. Telemetry auto-refreshing on 3-minute schedule.
+              Real-world CISA KEV CVE-2024-3400 + Abuse.ch Feodo Botnet C2 injected into incident queue. Live real-time telemetry streaming active.
             </p>
           </div>
           {onOpenLiveTraffic && (

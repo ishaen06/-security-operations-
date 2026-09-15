@@ -29,56 +29,32 @@ export const LiveLogsTable: React.FC = () => {
   const [selectedAction, setSelectedAction] = useState<string>('ALL');
   const [isSyncing, setIsSyncing] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<'console' | 'table'>('console');
-
-  // 3-Minute Automated Data Log Update Cycle State (180 seconds)
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(180);
-  const [lastRefreshedTime, setLastRefreshedTime] = useState<string>(() => {
-    const now = new Date();
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} UTC`;
-  });
+  const [isLiveStreaming, setIsLiveStreaming] = useState<boolean>(true);
   const [refreshNotice, setRefreshNotice] = useState<string | null>(null);
 
   const packetCounterRef = useRef<number>(25);
   const isSyncingRef = useRef<boolean>(false);
-  const lastManualSyncRef = useRef<number>(0);
+  const isBackendConnectedRef = useRef<boolean>(false);
   const noticeTimeoutRef = useRef<any>(null);
 
-  // Stable batch ingestion function
-  const ingestBatch = () => {
-    const now = new Date();
-    const timeStr = `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')} UTC`;
-
-    // Ingest fresh batch of 25 timestamped packets
-    const freshBatch: TrafficPacket[] = [];
-    for (let i = 0; i < 25; i++) {
-      packetCounterRef.current += 1;
-      freshBatch.push(generateClientSidePacket(packetCounterRef.current));
-    }
-
-    setPackets((prev) => [...prev.slice(-125), ...freshBatch]);
-    setLastRefreshedTime(timeStr);
-    setCountdownSeconds(180);
-
-    if (noticeTimeoutRef.current) {
-      clearTimeout(noticeTimeoutRef.current);
-    }
-    setRefreshNotice('3-Minute Cycle Complete: +25 fresh network telemetry logs committed');
-    noticeTimeoutRef.current = setTimeout(() => {
-      setRefreshNotice(null);
-    }, 4000);
-  };
-
-  // User click handler for "Sync Logs" button
+  // User click handler for "Sync Logs" button - injects immediate live burst
   const handleManualSync = async () => {
     if (isSyncingRef.current) return;
     isSyncingRef.current = true;
     setIsSyncing(true);
-    lastManualSyncRef.current = Date.now();
 
-    // Trigger local batch ingestion immediately
-    ingestBatch();
+    // Ingest immediate burst of 10 fresh live packets
+    const freshBurst: TrafficPacket[] = [];
+    for (let i = 0; i < 10; i++) {
+      packetCounterRef.current += 1;
+      freshBurst.push(generateClientSidePacket(packetCounterRef.current));
+    }
+    setPackets((prev) => [...freshBurst, ...prev.slice(0, 190)]);
 
-    // Notify backend sync endpoint in background without blocking or re-triggering
+    setRefreshNotice('Live Sync: +10 live telemetry packets injected');
+    if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
+    noticeTimeoutRef.current = setTimeout(() => setRefreshNotice(null), 3000);
+
     try {
       await fetch('http://localhost:5000/api/v1/emergency/force-sync', { 
         method: 'POST',
@@ -88,44 +64,32 @@ export const LiveLogsTable: React.FC = () => {
       // Backend offline fallback handled cleanly
     }
 
-    // Stable, smooth transition without UI jumping
     setTimeout(() => {
       setIsSyncing(false);
       isSyncingRef.current = false;
-    }, 600);
+    }, 500);
   };
 
-  // 3-minute countdown timer (ticks every second)
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCountdownSeconds((prev) => {
-        if (prev <= 1) {
-          setTimeout(() => ingestBatch(), 0);
-          return 180;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, []);
-
-  // Listen for backend 3-minute batch update events (ignoring manual echo to prevent glitch loops)
+  // Real-time live SSE stream from backend (:5000)
   useEffect(() => {
     let eventSource: EventSource | null = null;
 
     try {
       eventSource = new EventSource('http://localhost:5000/api/v1/stream/traffic');
 
+      eventSource.onopen = () => {
+        isBackendConnectedRef.current = true;
+      };
+
       eventSource.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
-          // Strictly only ingest batches on the 3-minute recurring cycle
-          if (parsed.type === '3_MINUTE_DATA_UPDATE') {
-            // Ignore echo if manual sync was executed in the last 4 seconds
-            if (Date.now() - lastManualSyncRef.current < 4000) {
-              return;
+          // Ingest live packet continuously as it arrives
+          if (parsed.src_ip && parsed.id) {
+            isBackendConnectedRef.current = true;
+            if (isLiveStreaming) {
+              setPackets((prev) => [parsed, ...prev.slice(0, 199)]);
             }
-            ingestBatch();
           }
         } catch {
           // ignore
@@ -133,27 +97,36 @@ export const LiveLogsTable: React.FC = () => {
       };
 
       eventSource.onerror = () => {
+        isBackendConnectedRef.current = false;
         if (eventSource) {
           eventSource.close();
           eventSource = null;
         }
       };
     } catch {
-      // SSE not available
+      isBackendConnectedRef.current = false;
     }
 
     return () => {
       if (eventSource) eventSource.close();
       if (noticeTimeoutRef.current) clearTimeout(noticeTimeoutRef.current);
     };
-  }, []);
+  }, [isLiveStreaming]);
 
-  // Format countdown mm:ss
-  const formatCountdown = (totalSeconds: number) => {
-    const mins = Math.floor(totalSeconds / 60);
-    const secs = totalSeconds % 60;
-    return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
-  };
+  // Client-side real-time continuous stream fallback if backend SSE is disconnected
+  useEffect(() => {
+    if (!isLiveStreaming) return;
+
+    const streamInterval = setInterval(() => {
+      if (!isBackendConnectedRef.current) {
+        packetCounterRef.current += 1;
+        const pkt = generateClientSidePacket(packetCounterRef.current);
+        setPackets((prev) => [pkt, ...prev.slice(0, 199)]);
+      }
+    }, 900);
+
+    return () => clearInterval(streamInterval);
+  }, [isLiveStreaming]);
 
   // Helper to determine subnet
   const getSubnet = (ip: string) => {
@@ -216,31 +189,43 @@ export const LiveLogsTable: React.FC = () => {
             Log
           </h3>
           <p className="text-xs font-mono text-[#6C757D] dark:text-[#9BA3AF] mt-0.5">
-            Network packet telemetry across Core Gateway and Subnets A, B, and C • Refreshes every 3 mins
+            Real-time continuous packet telemetry streaming across Core Gateway and Subnets A, B, and C
           </p>
         </div>
 
-        {/* 3-Minute Cycle Controls & Indicator */}
+        {/* Real-Time Live Stream Controls & Indicator */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* 3-Minute Countdown Meter - Clean, borderless */}
+          {/* Live Streaming Indicator */}
           <div className="flex items-center gap-2 font-mono text-xs text-[#495057] dark:text-[#9BA3AF]">
-            <Clock className="w-3.5 h-3.5 text-[#FF000F] animate-pulse" />
+            <span className="relative flex h-2.5 w-2.5">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full ${isLiveStreaming ? 'bg-emerald-400 opacity-75' : 'bg-amber-400 opacity-75'}`}></span>
+              <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${isLiveStreaming ? 'bg-emerald-500' : 'bg-amber-500'}`}></span>
+            </span>
             <div>
-              <div className="text-[9px] text-[#6C757D] uppercase font-bold tracking-wider leading-none">
-                Next Ingestion Batch
+              <div className={`text-[9px] uppercase font-bold tracking-wider leading-none ${isLiveStreaming ? 'text-emerald-600 dark:text-emerald-400' : 'text-amber-600 dark:text-amber-400'}`}>
+                {isLiveStreaming ? 'LIVE STREAMING' : 'STREAM PAUSED'}
               </div>
-              <div className="font-bold text-sm text-[#181B1F] dark:text-white mt-0.5 leading-none">
-                {formatCountdown(countdownSeconds)}
+              <div className="font-bold text-xs text-[#181B1F] dark:text-white mt-0.5 leading-none">
+                {packets.length} Events Logged
               </div>
             </div>
           </div>
 
-          {/* Sync Now Button - Stable dimensions, no width-jumping or glitching */}
+          {/* Pause / Resume Feed Toggle */}
+          <button
+            onClick={() => setIsLiveStreaming(prev => !prev)}
+            className="px-2.5 py-1.5 bg-white dark:bg-[#1F242C] border border-[#CED4DA] dark:border-[#343B45] hover:border-[#FF000F] text-[#181B1F] dark:text-white rounded-sm text-xs font-mono font-bold transition-colors shadow-xs cursor-pointer select-none"
+            title={isLiveStreaming ? "Pause live stream" : "Resume live stream"}
+          >
+            {isLiveStreaming ? 'Pause Feed' : 'Resume Live'}
+          </button>
+
+          {/* Sync Now Button - Injects fresh live burst immediately */}
           <button
             onClick={handleManualSync}
             disabled={isSyncing}
-            className="flex items-center justify-center gap-1.5 w-28 px-3 py-1.5 bg-[#181B1F] text-white hover:bg-black rounded-sm text-xs font-mono font-bold uppercase transition-all shadow-xs disabled:opacity-75 cursor-pointer disabled:cursor-not-allowed select-none"
-            title="Force immediate 3-minute log batch ingestion"
+            className="flex items-center justify-center gap-1.5 w-28 px-3 py-1.5 bg-[#181B1F] text-white hover:bg-black rounded-sm text-xs font-mono font-bold uppercase transition-all shadow-xs disabled:opacity-75 cursor-pointer select-none"
+            title="Inject live packet burst immediately"
           >
             <RefreshCw className={`w-3.5 h-3.5 shrink-0 ${isSyncing ? 'animate-spin text-[#FF000F]' : ''}`} />
             <span className="truncate">{isSyncing ? 'Syncing...' : 'Sync Logs'}</span>
@@ -257,14 +242,14 @@ export const LiveLogsTable: React.FC = () => {
         </div>
       </div>
 
-      {/* 3-Minute Refresh Notification Banner (if recently synced) */}
+      {/* Live Notice Banner (if triggered) */}
       {refreshNotice && (
         <div className="px-5 py-2 bg-emerald-50 dark:bg-emerald-950/40 border-b border-emerald-200 dark:border-emerald-800 text-xs font-mono text-emerald-800 dark:text-emerald-300 flex items-center justify-between animate-fadeIn">
           <div className="flex items-center gap-2">
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
             <span className="font-bold">{refreshNotice}</span>
           </div>
-          <span className="text-[10px] text-emerald-700">Last cycle: {lastRefreshedTime}</span>
+          <span className="text-[10px] text-emerald-700">Live Active</span>
         </div>
       )}
 
@@ -498,9 +483,9 @@ export const LiveLogsTable: React.FC = () => {
           <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
           <span>Active Buffer: {packets.length} logs</span>
           <span>•</span>
-          <span>Next Auto-Ingestion: {formatCountdown(countdownSeconds)}</span>
+          <span>Feed: Real-Time Live Streaming</span>
           <span>•</span>
-          <span>Last Sync: {lastRefreshedTime}</span>
+          <span>Mode: Continuous Live Ingestion</span>
         </div>
 
         <div>

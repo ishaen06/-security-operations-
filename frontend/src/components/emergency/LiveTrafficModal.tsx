@@ -50,58 +50,32 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
   const [pps, setPps] = useState<number>(28);
   const [bandwidthMb, setBandwidthMb] = useState<number>(1.48);
 
-  // 3-Minute Automated Data Log Update Cycle State (180 seconds)
-  const [countdownSeconds, setCountdownSeconds] = useState<number>(180);
+  // Live Streaming Telemetry State
   const [lastRefreshedTime, setLastRefreshedTime] = useState<string>(() => new Date().toLocaleTimeString());
-  const [refreshNotification, setRefreshNotification] = useState<string | null>(null);
 
   const scrollBottomRef = useRef<HTMLDivElement>(null);
   const packetCounterRef = useRef<number>(100);
 
-  // Function to execute the 3-minute log data update
-  const triggerThreeMinuteLogUpdate = async () => {
-    // Generate fresh batch of 25 log records
+  // Function to inject fresh live packet burst
+  const injectLiveBurst = async () => {
     const freshPackets: TrafficPacket[] = [];
-    for (let i = 0; i < 25; i++) {
+    for (let i = 0; i < 10; i++) {
       packetCounterRef.current += 1;
       freshPackets.push(generateClientSidePacket(packetCounterRef.current));
     }
-    setPackets((prev) => [...prev.slice(-125), ...freshPackets]);
+    setPackets((prev) => [...prev.slice(-190), ...freshPackets]);
     setLastRefreshedTime(new Date().toLocaleTimeString());
-    setCountdownSeconds(180);
+    setPps(Math.floor(28 + Math.random() * 16));
+    setBandwidthMb(parseFloat((1.4 + Math.random() * 0.8).toFixed(2)));
 
-    // Jitter metrics on 3-minute batch sync
-    setPps(Math.floor(22 + Math.random() * 16));
-    setBandwidthMb(parseFloat((1.1 + Math.random() * 0.8).toFixed(2)));
-
-    // Show temporary notice
-    setRefreshNotification('3-Minute Log Ingestion Cycle Complete: +25 fresh events logged');
-    setTimeout(() => setRefreshNotification(null), 4000);
-
-    // Also notify backend if online
     try {
       await fetch('http://localhost:5000/api/v1/emergency/force-sync', { method: 'POST' });
     } catch {
-      // Backend offline fallback handled cleanly
+      // Offline fallback
     }
   };
 
-  // 3-minute countdown timer (ticks every second)
-  useEffect(() => {
-    if (!isOpen) return;
-    const timer = setInterval(() => {
-      setCountdownSeconds((prev) => {
-        if (prev <= 1) {
-          triggerThreeMinuteLogUpdate();
-          return 180;
-        }
-        return prev - 1;
-      });
-    }, 1000);
-    return () => clearInterval(timer);
-  }, [isOpen]);
-
-  // Connect to SSE backend for 3-minute synchronization (strictly no live per-second streaming)
+  // Connect to SSE backend for continuous live streaming
   useEffect(() => {
     if (!isOpen) return;
 
@@ -117,8 +91,10 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
       eventSource.onmessage = (event) => {
         try {
           const parsed = JSON.parse(event.data);
-          if (parsed.type === '3_MINUTE_DATA_UPDATE') {
-            triggerThreeMinuteLogUpdate();
+          if (parsed.src_ip && parsed.id) {
+            setPackets((prev) => [...prev.slice(-199), parsed]);
+            setPps(Math.floor(24 + Math.random() * 12));
+            setBandwidthMb(parseFloat((1.2 + Math.random() * 0.6).toFixed(2)));
           }
         } catch {
           // Non-packet event
@@ -140,6 +116,21 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
       if (eventSource) eventSource.close();
     };
   }, [isOpen]);
+
+  // Client-side live stream fallback if backend SSE is not connected
+  useEffect(() => {
+    if (!isOpen || backendConnected) return;
+
+    const liveTimer = setInterval(() => {
+      packetCounterRef.current += 1;
+      const p = generateClientSidePacket(packetCounterRef.current);
+      setPackets((prev) => [...prev.slice(-199), p]);
+      setPps(Math.floor(22 + Math.random() * 14));
+      setBandwidthMb(parseFloat((1.1 + Math.random() * 0.7).toFixed(2)));
+    }, 800);
+
+    return () => clearInterval(liveTimer);
+  }, [isOpen, backendConnected]);
 
   // Handle auto-scrolling
   useEffect(() => {
@@ -213,10 +204,10 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
               </span>
             </div>
             <h2 className="font-sans font-bold text-xl text-[#181B1F] dark:text-white tracking-tight mt-0.5">
-              Network Traffic & Emergency Telemetry (3-Minute Batch)
+              Network Traffic & Emergency Telemetry (Live Stream)
             </h2>
             <p className="text-xs text-[#6C757D] dark:text-[#9BA3AF] mt-0.5">
-              Automated 3-Minute Batch Ingestion • CISA KEV & Feodo Threat Feeds
+              Real-Time Live Telemetry Streaming • CISA KEV & Feodo Threat Feeds
             </p>
           </div>
 
@@ -227,12 +218,12 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
               className={`flex items-center gap-1.5 px-2.5 py-1 text-xs font-mono rounded-sm border ${
                 backendConnected 
                   ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
-                  : 'bg-amber-50 dark:bg-amber-950/40 border-amber-300 dark:border-amber-800 text-amber-700 dark:text-amber-400'
+                  : 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300 dark:border-emerald-800 text-emerald-700 dark:text-emerald-400'
               }`}
-              title={backendConnected ? "Connected to Node.js backend 3-minute batch stream (:5000)" : "Using high-fidelity client-side batch engine"}
+              title={backendConnected ? "Connected to Node.js backend live stream (:5000)" : "Using live client-side telemetry engine"}
             >
-              <span className={`w-2 h-2 rounded-full ${backendConnected ? 'bg-emerald-500 animate-pulse' : 'bg-amber-500'}`} />
-              <span>{backendConnected ? 'BATCH SSE (:5000)' : 'STANDALONE BATCH'}</span>
+              <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <span>{backendConnected ? 'LIVE SSE (:5000)' : 'LIVE STREAM'}</span>
             </div>
 
             {/* Emergency Drill Toggle Button */}
@@ -303,42 +294,29 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
             </div>
           </div>
 
-          {/* 3-Minute Recurring Log Ingestion & Refresh HUD Card */}
+          {/* Live Stream Telemetry HUD Card */}
           <div className="p-3 bg-[#F8F9FA] dark:bg-[#1F242C] border border-[#E2E6EA] dark:border-[#2E3540] rounded-sm col-span-2 sm:col-span-1">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-mono uppercase text-[#6C757D] dark:text-[#9BA3AF]">3-Min Log Cycle</span>
+              <span className="text-[10px] font-mono uppercase text-[#6C757D] dark:text-[#9BA3AF]">Live Stream Feed</span>
               <button 
-                onClick={triggerThreeMinuteLogUpdate} 
-                className="text-[10px] font-mono text-[#FF000F] hover:underline"
-                title="Force refresh 3-minute log batch now"
+                onClick={injectLiveBurst} 
+                className="text-[10px] font-mono text-[#FF000F] hover:underline cursor-pointer"
+                title="Inject live packet burst now"
               >
-                Sync Now
+                Inject Burst
               </button>
             </div>
             <div className="flex items-baseline gap-2 mt-1">
-              <span className={`font-outrun font-bold text-2xl ${countdownSeconds <= 30 ? 'text-amber-500 animate-pulse' : 'text-[#181B1F] dark:text-white'}`}>
-                {String(Math.floor(countdownSeconds / 60)).padStart(2, '0')}:{String(countdownSeconds % 60).padStart(2, '0')}
+              <span className="font-outrun font-bold text-2xl text-emerald-600 dark:text-emerald-400">
+                LIVE
               </span>
-              <span className="text-[10px] font-mono text-[#6C757D]">countdown</span>
+              <span className="text-[10px] font-mono text-[#6C757D]">streaming</span>
             </div>
             <div className="text-[10px] font-mono text-[#868E96] truncate mt-0.5">
-              Refreshed: {lastRefreshedTime}
+              {packets.length} Packets Captured
             </div>
           </div>
         </div>
-
-        {/* 3-Minute Refresh Notification Banner */}
-        {refreshNotification && (
-          <div className="px-4 py-2 bg-emerald-50 dark:bg-emerald-950/50 border-b border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-mono flex items-center justify-between animate-fadeIn">
-            <div className="flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>{refreshNotification}</span>
-            </div>
-            <span className="text-[10px] uppercase font-bold tracking-wider bg-emerald-100 dark:bg-emerald-900 px-2 py-0.5 rounded-xs">
-              Every 3 Min Automated
-            </span>
-          </div>
-        )}
 
         {/* Navigation Tabs & Toolbars */}
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-[#F1F3F5] dark:bg-[#1B2027] border-b border-[#E2E6EA] dark:border-[#282D35]">
@@ -352,7 +330,7 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
               }`}
             >
               <Terminal className="w-3.5 h-3.5 text-[#FF000F]" />
-              <span>Telemetry Logs (3-Min Batch)</span>
+              <span>Telemetry Logs (Live Stream)</span>
               <span className="text-[10px] font-mono px-1.5 py-0.2 bg-[#E9ECEF] dark:bg-[#282D35] rounded-xs">
                 {packets.length}
               </span>
@@ -460,12 +438,12 @@ export const LiveTrafficModal: React.FC<LiveTrafficModalProps> = ({
               {/* Stream Controls */}
               <div className="flex items-center gap-2 text-xs font-mono">
                 <button
-                  onClick={triggerThreeMinuteLogUpdate}
-                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border bg-[#F8F9FA] dark:bg-[#1F242C] border-[#CED4DA] dark:border-[#343B45] text-[#181B1F] dark:text-white hover:border-[#FF000F] transition-colors"
-                  title="Ingest fresh 3-minute log batch immediately"
+                  onClick={injectLiveBurst}
+                  className="flex items-center gap-1.5 px-2.5 py-1 rounded-sm border bg-[#F8F9FA] dark:bg-[#1F242C] border-[#CED4DA] dark:border-[#343B45] text-[#181B1F] dark:text-white hover:border-[#FF000F] transition-colors cursor-pointer"
+                  title="Inject live telemetry burst immediately"
                 >
                   <RefreshCw className="w-3 h-3 text-[#FF000F]" />
-                  <span>Sync Batch Now</span>
+                  <span>Inject Burst</span>
                 </button>
 
                 <label className="flex items-center gap-1.5 text-xs text-[#6C757D] dark:text-[#9BA3AF] cursor-pointer select-none">

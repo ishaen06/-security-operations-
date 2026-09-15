@@ -12,9 +12,7 @@ const FRONTEND_DATA_DIR = path.resolve(__dirname, '../frontend/src/data');
 const DATASET_FILE = path.join(DATA_DIR, 'emergency_ops_dataset.json');
 const LOG_FILE = path.join(DATA_DIR, 'emergency_traffic.log');
 
-const THREE_MINUTES_MS = 3 * 60 * 1000; // 180,000 ms
-let lastRefreshedAt = new Date();
-let nextRefreshAt = new Date(Date.now() + THREE_MINUTES_MS);
+let lastActivityAt = new Date();
 
 // Cache emergency dataset
 let emergencyDataset = null;
@@ -33,7 +31,7 @@ loadDatasetFromDisk();
 // Active SSE client connections
 const sseClients = new Set();
 
-// Generator for live traffic stream
+// Generator for continuous live traffic stream
 function generateLivePacket() {
   const isC2Attack = Math.random() < 0.22;
   const c2List = emergencyDataset?.activeThreatC2Feed || [];
@@ -88,73 +86,59 @@ function generateLivePacket() {
   }
 }
 
-// 3-Minute Recurring Ingestion & Threat Feed Update Function
-async function performThreeMinuteDataLogUpdate() {
-  lastRefreshedAt = new Date();
-  nextRefreshAt = new Date(Date.now() + THREE_MINUTES_MS);
-  console.log(`[3-MIN CYCLE] Starting 3-minute log data refresh at ${lastRefreshedAt.toISOString()}...`);
+// Write a single log entry to the append-only log file
+function appendToLogFile(p) {
+  const line = `<134>1 ${p.timestamp} perimeter-ngfw.abb.internal AbbCyberOps 4102 - [traffic@4102 src_ip="${p.src_ip}" dst_ip="${p.dst_ip}" proto="${p.protocol}" src_port=${p.src_port} dst_port=${p.dst_port} action="${p.action}" bytes=${p.bytes} packets=${p.packets} threat_score=${p.threat_score}] ${p.message}\n`;
+  try {
+    fs.appendFileSync(LOG_FILE, line, 'utf-8');
+    if (fs.existsSync(FRONTEND_DATA_DIR)) {
+      fs.appendFileSync(path.join(FRONTEND_DATA_DIR, 'emergency_traffic.log'), line, 'utf-8');
+    }
+  } catch {
+    // Ignore file write errors
+  }
+}
 
-  // Generate 25 new updated traffic log entries
-  const newPackets = [];
-  const c2List = emergencyDataset?.activeThreatC2Feed || [];
-  for (let i = 0; i < 25; i++) {
-    newPackets.push(generateLivePacket());
+// Continuous Real-Time Live Packet Telemetry Stream (Every 750ms)
+setInterval(() => {
+  const packet = generateLivePacket();
+  lastActivityAt = new Date();
+
+  // Send to all active SSE clients
+  if (sseClients.size > 0) {
+    const data = `data: ${JSON.stringify(packet)}\n\n`;
+    for (const client of sseClients) {
+      client.write(data);
+    }
   }
 
-  // Update memory and write log file
-  if (emergencyDataset) {
-    emergencyDataset.metadata.lastSyncCycle = lastRefreshedAt.toISOString();
-    emergencyDataset.metadata.updateInterval = '3 minutes (180s)';
-    emergencyDataset.sampleTrafficPackets = [
-      ...newPackets,
-      ...(emergencyDataset.sampleTrafficPackets || []).slice(0, 75)
-    ];
+  // Append live packet directly to logs
+  appendToLogFile(packet);
 
+  // Update in-memory dataset
+  if (emergencyDataset) {
+    emergencyDataset.sampleTrafficPackets = [
+      packet,
+      ...(emergencyDataset.sampleTrafficPackets || []).slice(0, 99)
+    ];
+  }
+}, 750);
+
+// Periodically flush in-memory dataset to disk every 15 seconds
+setInterval(() => {
+  if (emergencyDataset) {
     try {
+      emergencyDataset.metadata.lastSyncCycle = new Date().toISOString();
+      emergencyDataset.metadata.mode = 'Real-Time Live Streaming';
       fs.writeFileSync(DATASET_FILE, JSON.stringify(emergencyDataset, null, 2), 'utf-8');
       if (fs.existsSync(FRONTEND_DATA_DIR)) {
         fs.writeFileSync(path.join(FRONTEND_DATA_DIR, 'emergency_ops_dataset.json'), JSON.stringify(emergencyDataset, null, 2), 'utf-8');
       }
-
-      const logLines = emergencyDataset.sampleTrafficPackets.map(p => {
-        return `<134>1 ${p.timestamp} perimeter-ngfw.abb.internal AbbCyberOps 4102 - [traffic@4102 src_ip="${p.src_ip}" dst_ip="${p.dst_ip}" proto="${p.protocol}" src_port=${p.src_port} dst_port=${p.dst_port} action="${p.action}" bytes=${p.bytes} packets=${p.packets} threat_score=${p.threat_score}] ${p.message}`;
-      });
-      fs.writeFileSync(LOG_FILE, logLines.join('\n'), 'utf-8');
-      if (fs.existsSync(FRONTEND_DATA_DIR)) {
-        fs.writeFileSync(path.join(FRONTEND_DATA_DIR, 'emergency_traffic.log'), logLines.join('\n'), 'utf-8');
-      }
-      console.log(`[3-MIN CYCLE] Updated log files with 25 fresh records. Next update at: ${nextRefreshAt.toISOString()}`);
-    } catch (err) {
-      console.error('[ERROR] Failed to save 3-minute log cycle:', err.message);
+    } catch {
+      // Ignore disk flush errors
     }
   }
-
-  // Notify all connected SSE clients of the 3-minute update cycle
-  const refreshEvent = {
-    type: '3_MINUTE_DATA_UPDATE',
-    timestamp: lastRefreshedAt.toISOString(),
-    nextUpdateAt: nextRefreshAt.toISOString(),
-    recordsAdded: 25,
-    message: 'Data logs updated (3-minute automated cycle)'
-  };
-  const data = `data: ${JSON.stringify(refreshEvent)}\n\n`;
-  for (const client of sseClients) {
-    client.write(data);
-  }
-}
-
-// Start 3-minute recurring update timer
-setInterval(performThreeMinuteDataLogUpdate, THREE_MINUTES_MS);
-
-// Continuous live packet telemetry stream pulse (every 600ms)
-setInterval(() => {
-  if (sseClients.size === 0) return;
-  const packet = generateLivePacket();
-  const data = `data: ${JSON.stringify(packet)}\n\n`;
-  for (const client of sseClients) {
-    client.write(data);
-  }
-}, 600);
+}, 15000);
 
 const server = http.createServer((req, res) => {
   // CORS Headers
@@ -170,19 +154,15 @@ const server = http.createServer((req, res) => {
 
   const url = new URL(req.url, `http://${req.headers.host}`);
 
-  // Route: Health & Sync Status Check (including 3-minute cycle countdown)
+  // Route: Health & Real-Time Sync Status Check
   if (url.pathname === '/api/v1/health' || url.pathname === '/api/v1/emergency/sync-status') {
-    const secondsUntilNext = Math.max(0, Math.floor((nextRefreshAt.getTime() - Date.now()) / 1000));
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({
       status: 'UP',
+      mode: 'REAL_TIME_LIVE_STREAMING',
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      updateIntervalSeconds: 180,
-      updateIntervalDescription: '3 minutes',
-      lastRefreshedAt: lastRefreshedAt.toISOString(),
-      nextRefreshAt: nextRefreshAt.toISOString(),
-      secondsUntilNextUpdate: secondsUntilNext,
+      lastActivityAt: lastActivityAt.toISOString(),
       datasetAvailable: !!emergencyDataset,
       c2NodeCount: emergencyDataset?.activeThreatC2Feed?.length || 0,
       cveCount: emergencyDataset?.knownExploitedVulnerabilities?.length || 0,
@@ -191,11 +171,26 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Route: Manual Trigger of 3-Minute Refresh Cycle
+  // Route: Manual Live Ingestion Trigger / Force Sync
   if (url.pathname === '/api/v1/emergency/force-sync' && req.method === 'POST') {
-    performThreeMinuteDataLogUpdate();
+    const burst = [];
+    for (let i = 0; i < 10; i++) {
+      const p = generateLivePacket();
+      burst.push(p);
+      appendToLogFile(p);
+      if (sseClients.size > 0) {
+        const data = `data: ${JSON.stringify(p)}\n\n`;
+        for (const client of sseClients) {
+          client.write(data);
+        }
+      }
+    }
     res.writeHead(200, { 'Content-Type': 'application/json' });
-    res.end(JSON.stringify({ status: '3-minute data log update triggered immediately', timestamp: new Date().toISOString() }));
+    res.end(JSON.stringify({ 
+      status: 'Live burst packet injection committed', 
+      packetsInjected: burst.length, 
+      timestamp: new Date().toISOString() 
+    }));
     return;
   }
 
@@ -203,7 +198,7 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/api/v1/emergency/dataset') {
     if (!fs.existsSync(DATASET_FILE)) {
       res.writeHead(404, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ error: 'Emergency dataset not found. Please run fetch:data first.' }));
+      res.end(JSON.stringify({ error: 'Emergency dataset not found.' }));
       return;
     }
     const data = fs.readFileSync(DATASET_FILE, 'utf-8');
@@ -228,7 +223,7 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  // Route: Live SSE Traffic Stream
+  // Route: Real-Time Live SSE Traffic Stream
   if (url.pathname === '/api/v1/stream/traffic') {
     res.writeHead(200, {
       'Content-Type': 'text/event-stream',
@@ -236,13 +231,12 @@ const server = http.createServer((req, res) => {
       'Connection': 'keep-alive'
     });
 
-    // Send initial greeting event with 3-minute schedule
+    // Send initial connection event
     res.write(`data: ${JSON.stringify({ 
       type: 'CONNECTED', 
-      message: 'ABB CyberOps Live SSE Stream Connected (3-minute update cycle active)', 
+      message: 'ABB CyberOps Real-Time Live Telemetry Stream Connected', 
       timestamp: new Date().toISOString(),
-      updateIntervalSeconds: 180,
-      nextRefreshAt: nextRefreshAt.toISOString()
+      mode: 'LIVE_STREAMING'
     })}\n\n`);
 
     sseClients.add(res);
@@ -278,10 +272,9 @@ const server = http.createServer((req, res) => {
 
 server.listen(PORT, () => {
   console.log(`====================================================`);
-  console.log(`ABB CyberOps Live Telemetry Server running on http://localhost:${PORT}`);
-  console.log(` - 3-Minute Auto-Update Cycle ACTIVE (Every 180 seconds)`);
-  console.log(` - GET  /api/v1/emergency/sync-status`);
-  console.log(` - GET  /api/v1/stream/traffic (SSE Live Stream)`);
-  console.log(` - Next 3-minute update at: ${nextRefreshAt.toISOString()}`);
+  console.log(`ABB CyberOps Real-Time Live Telemetry Server running on http://localhost:${PORT}`);
+  console.log(` - Live Per-Second Telemetry Streaming: ACTIVE (No 3-minute interval)`);
+  console.log(` - GET  /api/v1/health`);
+  console.log(` - GET  /api/v1/stream/traffic (SSE Real-Time Live Stream)`);
   console.log(`====================================================`);
 });
