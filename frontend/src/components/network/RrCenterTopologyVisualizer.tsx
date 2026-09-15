@@ -204,10 +204,11 @@ const RESPONSE_STEPS = [
   { id: 4, label: 'RISK ASSESSMENT', desc: 'Blast radius calculated' },
   { id: 5, label: 'NETWORK ISOLATION', desc: 'Dynamic airgap policy enforced' },
   { id: 6, label: 'INCIDENT LOGGING', desc: 'SIEM audit record committed' },
-  { id: 7, label: 'REMEDIATION', desc: 'SOC containment playbook ready' }
+  { id: 7, label: 'REMEDIATION', desc: 'IP re-assigned & server reconnected' }
 ];
 
 export const RrCenterTopologyVisualizer: React.FC = () => {
+  const [subnets, setSubnets] = useState<Record<SubnetId, SubnetData>>(INITIAL_SUBNETS);
   const [attackedSubnetId, setAttackedSubnetId] = useState<SubnetId | null>(null);
   const [attackedDevice, setAttackedDevice] = useState<VulnerableDevice | null>(null);
   const [selectedAttackType, setSelectedAttackType] = useState<AttackType>('Port Scan');
@@ -216,6 +217,13 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
   const [detectionTimestamp, setDetectionTimestamp] = useState<string>('10:42:31');
   const [incidentId, setIncidentId] = useState<string>('INC-100024');
   const [flowSpeed, setFlowSpeed] = useState<'slow' | 'normal'>('slow');
+  const [isRemediating, setIsRemediating] = useState<boolean>(false);
+  const [remediationLog, setRemediationLog] = useState<{
+    hostname: string;
+    oldIp: string;
+    newIp: string;
+    timestamp: string;
+  } | null>(null);
 
   // Calibrated slow durations for request and data packet flows
   const trunkReqDur = flowSpeed === 'slow' ? '4.0s' : '2.0s';
@@ -250,9 +258,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     const incId = `INC-${Math.floor(100000 + Math.random() * 90000)}`;
     setIncidentId(incId);
     setAttackedSubnetId(subnetId);
+    setRemediationLog(null);
 
     // Resolve targeted vulnerable device
-    const device = targetDevice || INITIAL_SUBNETS[subnetId].vulnerableDevices[0];
+    const device = targetDevice || subnets[subnetId].vulnerableDevices[0];
     setAttackedDevice(device);
     setSelectedAttackType(device.attackVector);
 
@@ -291,6 +300,69 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
         targetDevice: null
       }
     }));
+  };
+
+  // Remediation Action: Change device IP address and reconnect to server
+  const handleRemediate = () => {
+    if (!attackedDevice || !attackedSubnetId) {
+      handleReset();
+      return;
+    }
+
+    setIsRemediating(true);
+
+    // Calculate new clean IP address on this subnet
+    const prefix = attackedSubnetId === 'subnet-a' ? '10.10.10.' : attackedSubnetId === 'subnet-b' ? '10.10.20.' : '10.10.30.';
+    const currentSuffix = parseInt(attackedDevice.ip.split('.').pop() || '10', 10);
+    const newSuffix = currentSuffix < 150 ? currentSuffix + 140 : currentSuffix - 50;
+    const newIp = `${prefix}${newSuffix}`;
+    const oldIp = attackedDevice.ip;
+    const hostname = attackedDevice.hostname;
+
+    setTimeout(() => {
+      // Reassign IP address of device in subnet state
+      setSubnets(prev => {
+        const currentSubnet = prev[attackedSubnetId];
+        if (!currentSubnet) return prev;
+        return {
+          ...prev,
+          [attackedSubnetId]: {
+            ...currentSubnet,
+            vulnerableDevices: currentSubnet.vulnerableDevices.map(d => 
+              d.id === attackedDevice.id ? { ...d, ip: newIp } : d
+            )
+          }
+        };
+      });
+
+      setRemediationLog({
+        hostname,
+        oldIp,
+        newIp,
+        timestamp: new Date().toLocaleTimeString()
+      });
+
+      setIsRemediating(false);
+      setAttackedSubnetId(null);
+      setAttackedDevice(null);
+      setResponseStep(0);
+
+      // Broadcast remediation completion and server reconnection
+      window.dispatchEvent(new CustomEvent('abb_attack_state', {
+        detail: {
+          isAttacking: false,
+          subnetId: null,
+          attackType: null,
+          targetDevice: null,
+          remediation: {
+            hostname,
+            oldIp,
+            newIp,
+            reconnected: true
+          }
+        }
+      }));
+    }, 600);
   };
 
   const isAttacking = attackedSubnetId !== null;
@@ -702,7 +774,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
           {/* LEVEL 3: Three Horizontally Segmented Subnets */}
           <div className="w-full grid grid-cols-1 md:grid-cols-3 gap-5">
             {(['subnet-a', 'subnet-b', 'subnet-c'] as SubnetId[]).map((subnetKey) => {
-              const subnet = INITIAL_SUBNETS[subnetKey];
+              const subnet = subnets[subnetKey];
               const isCompromised = attackedSubnetId === subnetKey;
               const isHealthy = !isCompromised;
 
@@ -1117,10 +1189,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             <div className="p-2.5 bg-[#F8F9FA] dark:bg-[#1B2027] border border-[#E2E6EA] dark:border-[#282D35] rounded-xs">
               <span className="text-[#6C757D] text-[10px] uppercase">Affected Subnet</span>
               <div className="font-bold text-[#FF000F] mt-0.5">
-                {INITIAL_SUBNETS[attackedSubnetId].name} ({INITIAL_SUBNETS[attackedSubnetId].cidr})
+                {subnets[attackedSubnetId].name} ({subnets[attackedSubnetId].cidr})
               </div>
               <div className="text-[10px] text-[#6C757D] truncate mt-0.5">
-                {INITIAL_SUBNETS[attackedSubnetId].totalHosts} Hosts In Enclave
+                {subnets[attackedSubnetId].totalHosts} Hosts In Enclave
               </div>
             </div>
 
@@ -1173,7 +1245,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 AUTOMATED ZERO-TRUST AIRGAP CONTAINMENT VERIFIED
               </div>
               <div className="text-[#495057] dark:text-[#CBD5E1] mt-1">
-                Zero-Trust micro-segmentation successfully severed the conduit to {INITIAL_SUBNETS[attackedSubnetId].name}. Target endpoint <strong>{attackedDevice?.hostname} ({attackedDevice?.ip})</strong> was quarantined before lateral pivot into other industrial tiers.
+                Zero-Trust micro-segmentation successfully severed the conduit to {subnets[attackedSubnetId].name}. Target endpoint <strong>{attackedDevice?.hostname} ({attackedDevice?.ip})</strong> was quarantined before lateral pivot into other industrial tiers.
               </div>
               {attackedDevice?.exploitPayload && (
                 <div className="mt-1 text-[11px] text-[#FF000F]">
@@ -1182,20 +1254,49 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
               )}
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
-              <span className="text-[10px] px-2 py-1 bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-300 rounded-xs font-bold">
-                NON-IMPACTED: 508 HOSTS ONLINE
-              </span>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <button
+                onClick={handleRemediate}
+                disabled={isRemediating}
+                className="px-3.5 py-1.5 bg-[#FF000F] hover:bg-[#D9000D] text-white rounded-xs text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer disabled:opacity-50"
+                title="Change device IP address and securely reconnect to server"
+              >
+                <RotateCcw className={`w-3.5 h-3.5 ${isRemediating ? 'animate-spin' : ''}`} />
+                <span>{isRemediating ? 'Reassigning IP & Reconnecting...' : 'Remediate: Change IP & Reconnect Server'}</span>
+              </button>
+
               <button
                 onClick={handleReset}
                 className="px-3 py-1.5 bg-[#181B1F] text-white hover:bg-black rounded-xs text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
-                title="Restore normal segmented network baseline"
+                title="Dismiss and restore baseline"
               >
-                <RotateCcw className="w-3.5 h-3.5" />
                 <span>Neutralize Threat</span>
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Persistent Remediation Success Confirmation */}
+      {remediationLog && (
+        <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 border-2 border-emerald-500 rounded-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs font-mono animate-fadeIn">
+          <div className="flex items-start sm:items-center gap-2.5">
+            <CheckCircle2 className="w-5 h-5 text-emerald-600 dark:text-emerald-400 shrink-0 mt-0.5 sm:mt-0" />
+            <div>
+              <span className="font-bold text-emerald-800 dark:text-emerald-200 uppercase tracking-wide">
+                REMEDIATION EXECUTED: DEVICE RECONNECTED TO SERVER
+              </span>
+              <div className="text-[#495057] dark:text-[#CBD5E1] mt-0.5">
+                Device <strong>{remediationLog.hostname}</strong> IP address was changed from <span className="line-through text-red-600">{remediationLog.oldIp}</span> to <span className="font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-100 dark:bg-emerald-900/50 px-1.5 py-0.5 rounded-xs">{remediationLog.newIp}</span>. Local ARP cache flushed and secure TLS channel re-established with Core Gateway Server.
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => setRemediationLog(null)}
+            className="text-[#6C757D] hover:text-black dark:hover:text-white text-xs font-bold px-2 py-1 rounded-xs border border-emerald-300 dark:border-emerald-800 shrink-0 self-end sm:self-center"
+          >
+            Dismiss
+          </button>
         </div>
       )}
       </div>

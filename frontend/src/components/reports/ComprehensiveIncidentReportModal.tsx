@@ -143,15 +143,15 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
         },
         {
           step: 3,
-          title: 'Host Forensic Acquisition & Quarantine',
-          status: 'IN PROGRESS',
-          action: 'Captured volatile RAM dumps from 10.10.10.14 and 10.10.10.84; severed lateral bastion jump sessions via EDR quarantine.'
+          title: 'Device IP Address Re-assignment & ARP Flush',
+          status: 'EXECUTED / ACTIVE',
+          action: 'Changed compromised identity host IP address from 10.10.10.14 to clean isolated IP 10.10.10.185; flushed local ARP routing tables and quarantined old IP.'
         },
         {
           step: 4,
-          title: 'Patch Deployment & System Restoration',
-          status: 'PENDING APPROVAL',
-          action: 'Apply vendor security patch for CVE-2024-21887; verify LDAP query baseline thresholds before reconnecting gateway routing.'
+          title: 'Secure Server Reconnection & Directory Restoration',
+          status: 'COMPLETED',
+          action: 'Securely reconnected the newly addressed host to the central directory server; confirmed nominal encrypted Kerberos and LDAP replication flows.'
         }
       ]
     },
@@ -241,15 +241,15 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
         },
         {
           step: 3,
-          title: 'Time-Series Database Integrity Check',
-          status: 'IN PROGRESS',
-          action: 'Restored TSDB historical metrics from golden cryptographic replica snapshot; purged malformed ingestion batches.'
+          title: 'Device IP Address Re-assignment & Network Quarantine',
+          status: 'EXECUTED / ACTIVE',
+          action: 'Changed compromised analytics node IP from 10.10.20.14 to clean isolated IP 10.10.20.188; flushed local ARP cache and revoked vulnerable IP lease.'
         },
         {
           step: 4,
-          title: 'Compute Load Baseline & Resumption',
-          status: 'PENDING APPROVAL',
-          action: 'Verify CPU load returns below 35% nominal threshold before lifting boundary routing restrictions.'
+          title: 'Secure Server Reconnection & Telemetry Resumption',
+          status: 'COMPLETED',
+          action: 'Securely reconnected the newly addressed host to the core telemetry server; restored TSDB stream and verified compute load below 35%.'
         }
       ]
     },
@@ -339,15 +339,15 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
         },
         {
           step: 3,
-          title: 'Modbus Register Golden State Rollback',
-          status: 'IN PROGRESS',
-          action: 'Restored Modbus Holding Register 40001 to nominal 3,000 RPM and Register 40105 to Auto-Relief (0x01) from golden hash snapshot.'
+          title: 'Device IP Address Re-assignment & Quarantine',
+          status: 'EXECUTED / ACTIVE',
+          action: 'Changed compromised SCADA device IP from 10.10.30.42 to clean quarantined IP 10.10.30.198; flushed local ARP caches and revoked compromised IP lease.'
         },
         {
           step: 4,
-          title: 'PLC Firmware Verification & SIL-3 Validation',
-          status: 'PENDING APPROVAL',
-          action: 'Verify cryptographic checksums on PLC controllers; confirm SIL-3 emergency mechanical interlocks are operational prior to re-arming.'
+          title: 'Secure Server Reconnection & Golden State Verification',
+          status: 'COMPLETED',
+          action: 'Securely reconnected the newly addressed device to the core SCADA server via mutual TLS; restored Modbus holding registers 40001 (3,000 RPM) & 40105 (0x01) at nominal baseline.'
         }
       ]
     },
@@ -422,15 +422,15 @@ export const ComprehensiveIncidentReportModal: React.FC<IncidentReportModalProps
         },
         {
           step: 3,
-          title: 'Telemetry Reconciliation',
-          status: 'IN PROGRESS',
-          action: 'Reconciled 25-log emergency batch queue against historical baseline logs in backend storage.'
+          title: 'Dynamic Endpoint IP Re-assignment Simulation',
+          status: 'COMPLETED',
+          action: 'Simulated automated DHCP IP lease re-assignment across all affected endpoints; verified old IP leases were invalidated.'
         },
         {
           step: 4,
-          title: 'SOC Post-Drill Evaluation',
-          status: 'PENDING COMPLETION',
-          action: 'Benchmark SOC response latency against ISO/IEC 27035 target standards.'
+          title: 'Automated Server Reconnection & Telemetry Reconciliation',
+          status: 'COMPLETED',
+          action: 'Safely reconnected newly addressed test endpoints to the unified edge server; reconciled 25-log emergency batch queue with 100% integrity.'
         }
       ]
     }
