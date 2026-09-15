@@ -1,0 +1,214 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Local ABB Voice Font Bindings */
+@font-face {
+  font-family: 'ABBVoice';
+  src: local('ABB Voice Light'), local('ABBVoice-Light'), local('ABBVoiceLight');
+  font-weight: 300;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ABBVoice';
+  src: local('ABB Voice'), local('ABBVoice'), local('ABBVoice-Regular'), local('ABBVoiceRegular');
+  font-weight: 400;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ABBVoice';
+  src: local('ABB Voice Medium'), local('ABBVoice-Medium'), local('ABBVoiceMedium');
+  font-weight: 500;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ABBVoice';
+  src: local('ABB Voice Bold'), local('ABBVoice-Bold'), local('ABBVoiceBold');
+  font-weight: 700;
+  font-style: normal;
+}
+@font-face {
+  font-family: 'ABBVoice';
+  src: local('ABB Voice Black'), local('ABBVoice-Black'), local('ABBVoiceBlack');
+  font-weight: 900;
+  font-style: normal;
+}
+
+@layer base {
+  body {
+    @apply bg-[#F8F9FA] text-[#181B1F] font-sans antialiased text-sm;
+    letter-spacing: -0.015em;
+  }
+
+  h1, h2, h3, h4 {
+    letter-spacing: -0.025em;
+  }
+}
+
+/* Dark Mode Industrial Styling */
+html.dark {
+  color-scheme: dark;
+}
+
+html.dark body {
+  background-color: #0F1115 !important;
+  color: #F0F2F5 !important;
+}
+
+/* Dark mode mapping for surfaces */
+html.dark .bg-white {
+  background-color: #16191E !important;
+}
+html.dark .bg-\[\#F8F9FA\] {
+  background-color: #0F1115 !important;
+}
+html.dark .bg-\[\#F1F3F5\] {
+  background-color: #1E2229 !important;
+}
+html.dark .bg-\[\#FFF8F8\] {
+  background-color: #241416 !important;
+}
+
+/* Dark mode borders */
+html.dark .border-\[\#E2E6EA\],
+html.dark .border-\[\#E9ECEF\],
+html.dark .border-\[\#F1F3F5\],
+html.dark .border-\[\#F8F9FA\] {
+  border-color: #282D35 !important;
+}
+html.dark .border-\[\#CED4DA\],
+html.dark .border-\[\#DEE2E6\] {
+  border-color: #373E48 !important;
+}
+
+/* Dark mode badge colors */
+html.dark .bg-\[\#FFF1F2\] {
+  background-color: #381215 !important;
+}
+html.dark .border-\[\#FFA3A8\] {
+  border-color: #66181E !important;
+}
+html.dark .text-\[\#D6000D\] {
+  color: #FF4D57 !important;
+}
+
+html.dark .bg-\[\#FFF4E6\] {
+  background-color: #331C0E !important;
+}
+html.dark .border-\[\#FFD8A8\] {
+  border-color: #592B0C !important;
+}
+html.dark .text-\[\#D9480F\] {
+  color: #FF8743 !important;
+}
+
+html.dark .bg-\[\#E7F5FF\] {
+  background-color: #0E2439 !important;
+}
+html.dark .border-\[\#A5D8FF\] {
+  border-color: #184266 !important;
+}
+html.dark .text-\[\#1971C2\],
+html.dark .text-\[\#1C7ED6\] {
+  color: #5DB5FF !important;
+}
+
+html.dark .bg-\[\#EBFBEE\],
+html.dark .bg-emerald-50 {
+  background-color: #0E2E18 !important;
+}
+html.dark .border-\[\#B2F2BB\],
+html.dark .border-emerald-200 {
+  border-color: #1A542C !important;
+}
+html.dark .text-\[\#2F9E44\],
+html.dark .text-emerald-700 {
+  color: #51CF66 !important;
+}
+
+html.dark .bg-\[\#FFF9DB\] {
+  background-color: #332B0E !important;
+}
+html.dark .border-\[\#FFE066\] {
+  border-color: #59460C !important;
+}
+html.dark .text-\[\#E67700\] {
+  color: #FFD43B !important;
+}
+
+/* Dark mode typography */
+html.dark .text-\[\#181B1F\] {
+  color: #F0F2F5 !important;
+}
+html.dark .text-\[\#495057\],
+html.dark .text-\[\#5A626E\] {
+  color: #9CA3AF !important;
+}
+html.dark .text-\[\#6C757D\],
+html.dark .text-\[\#868E96\] {
+  color: #828B99 !important;
+}
+
+/* Dark mode interactive & hover states */
+html.dark .hover\:bg-\[\#F8F9FA\]:hover,
+html.dark .hover\:bg-\[\#F1F3F5\]:hover,
+html.dark .hover\:bg-gray-50:hover {
+  background-color: #222730 !important;
+}
+html.dark .hover\:border-\[\#CED4DA\]:hover,
+html.dark .hover\:border-\[\#181B1F\]:hover {
+  border-color: #4B5563 !important;
+}
+
+/* Dark mode inputs, selects, textareas */
+html.dark input, 
+html.dark select, 
+html.dark textarea {
+  background-color: #1A1E24 !important;
+  color: #F0F2F5 !important;
+  border-color: #373E48 !important;
+}
+html.dark input::placeholder {
+  color: #6B7280 !important;
+}
+
+/* Dark mode scrollbars */
+html.dark ::-webkit-scrollbar-track {
+  background: #12151A;
+}
+html.dark ::-webkit-scrollbar-thumb {
+  background: #2D333B;
+}
+html.dark ::-webkit-scrollbar-thumb:hover {
+  background: #444C56;
+}
+
+/* Industrial subtle scrollbars */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #F1F3F5;
+}
+::-webkit-scrollbar-thumb {
+  background: #CED4DA;
+  border-radius: 2px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #ADB5BD;
+}
+
+/* Custom print stylesheet for PDF report export */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+  .no-print {
+    display: none !important;
+  }
+  .print-only {
+    display: block !important;
+  }
+}

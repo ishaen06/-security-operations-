@@ -1,0 +1,12 @@
+{
+  "name": "abb-security-ops-backend",
+  "version": "1.0.0",
+  "description": "Backend API specifications and service schemas for ABB CyberOps Platform",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "fetch:data": "node scripts/fetch_emergency_data.js",
+    "validate:spec": "echo 'Validating OpenAPI specification... OK'"
+  }
+}

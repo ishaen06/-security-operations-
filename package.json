@@ -1,0 +1,15 @@
+{
+  "name": "abb-security-operations-monorepo",
+  "private": true,
+  "version": "1.0.0",
+  "description": "ABB Enterprise Cybersecurity Monitoring and Incident-Response Platform",
+  "workspaces": [
+    "frontend",
+    "backend"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=frontend",
+    "build": "npm run build --workspace=frontend",
+    "preview": "npm run preview --workspace=frontend"
+  }
+}
