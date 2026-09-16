@@ -212,3 +212,14 @@ html.dark ::-webkit-scrollbar-thumb:hover {
     display: block !important;
   }
 }
+
+/* 3-second Step Timer Progression Bar */
+@keyframes stepTimerBar {
+  0% {
+    width: 0%;
+  }
+  100% {
+    width: 100%;
+  }
+}
+

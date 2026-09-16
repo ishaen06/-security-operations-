@@ -262,10 +262,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       deviceId: targetDevice.id
     });
 
-    // PHASE 1: Re-assign IP Lease of the system (starts immediately)
+    // PHASE 1: Re-assign IP Lease of the system (starts immediately, lasts 1.5s)
     setRemediationPhase('assigning_ip');
 
-    // PHASE 2 (after 400ms): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Main Server (10.10.0.1)
+    // PHASE 2 (after 1500ms): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Main Server (10.10.0.1)
     setTimeout(() => {
       // Reassign IP address of device in subnet state immediately so nodes update on canvas
       setSubnets(prev => {
@@ -284,9 +284,9 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
 
       setRemediationPhase('reconnecting');
       setReconnectingSubnetId(targetSubnet);
-    }, 400);
+    }, 1500);
 
-    // PHASE 3 (after 1050ms total): Main Server acknowledges reconnection, TLS tunnel active, telemetry restored
+    // PHASE 3 (after 3000ms total = 3s duration for Step 7): Main Server acknowledges reconnection, TLS tunnel active, telemetry restored
     setTimeout(() => {
       setRemediationPhase('restored');
       setRemediationLog({
@@ -335,13 +335,18 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
           }
         }
       }));
-    }, 1050);
+    }, 3000);
   };
 
   // Sequential progression when attack is simulated:
-  // Step 1: Detection -> Step 2: Classification -> Step 3: Subnet Identification ->
-  // Step 4: Risk Assessment -> Step 5: Network Isolation -> Step 6: Incident Logging (completed) ->
-  // Automated Remediation: IP address rotated & system reconnected to Main Server (10.10.0.1)
+  // Each step runs for exactly 3 seconds:
+  // Step 1: Detection (0s - 3s)
+  // Step 2: Classification (3s - 6s)
+  // Step 3: Subnet Identification (6s - 9s)
+  // Step 4: Risk Assessment (9s - 12s)
+  // Step 5: Network Isolation (12s - 15s)
+  // Step 6: Incident Logging (15s - 18s)
+  // Step 7: Automated Remediation (18s - 21s) -> IP address rotated & system reconnected to Main Server (10.10.0.1)
   useEffect(() => {
     if (!attackedSubnetId || !attackedDevice) {
       if (!isRemediating) {
@@ -350,20 +355,20 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       return;
     }
 
-    setResponseStep(1);
+    setResponseStep(1); // Step 1 starts at 0s (lasts 3s)
     const targetSubnet = attackedSubnetId;
     const targetDevice = attackedDevice;
 
     const timers = [
-      setTimeout(() => setResponseStep(2), 140), // Step 2: Classification
-      setTimeout(() => setResponseStep(3), 280), // Step 3: Subnet Identification
-      setTimeout(() => setResponseStep(4), 420), // Step 4: Risk Assessment
-      setTimeout(() => setResponseStep(5), 560), // Step 5: Network Isolation
-      setTimeout(() => setResponseStep(6), 700), // Step 6: Incident Logging in progress
-      // Automatically execute remediation once Step 6 (Incident Logging) is completed:
+      setTimeout(() => setResponseStep(2), 3000),  // Step 2: Classification (starts at 3s, lasts 3s)
+      setTimeout(() => setResponseStep(3), 6000),  // Step 3: Subnet Identification (starts at 6s, lasts 3s)
+      setTimeout(() => setResponseStep(4), 9000),  // Step 4: Risk Assessment (starts at 9s, lasts 3s)
+      setTimeout(() => setResponseStep(5), 12000), // Step 5: Network Isolation (starts at 12s, lasts 3s)
+      setTimeout(() => setResponseStep(6), 15000), // Step 6: Incident Logging (starts at 15s, lasts 3s)
+      // Automatically execute remediation once Step 6 completes after 3s (at 18s):
       setTimeout(() => {
         executeRemediation(targetSubnet, targetDevice);
-      }, 1300),
+      }, 18000),                                   // Step 7: Remediation (starts at 18s, lasts 3s until 21s)
     ];
 
     return () => timers.forEach(t => clearTimeout(t));
@@ -502,18 +507,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             <span className="text-[10px] font-mono text-[#6C757D] dark:text-[#9BA3AF]">
               {isRemediating ? (
                 <span className="text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
-                  Step 7 Active: Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
+                  Step 7 Active (3s): Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
                 </span>
               ) : isAttacking ? (
-                responseStep === 6 ? (
-                  <span className="text-amber-600 dark:text-amber-400 font-bold animate-pulse">
-                    Step 6: Logging Completed (SIEM Audit Committed) → Automating Remediation...
-                  </span>
-                ) : (
-                  <span className="text-[#FF000F] font-bold">
-                    Phase {responseStep} of 7 active • Airgap isolation enforced
-                  </span>
-                )
+                <span className="text-[#FF000F] font-bold">
+                  Step {responseStep} of 7 Active (3s) • {RESPONSE_STEPS[responseStep - 1]?.label}: {RESPONSE_STEPS[responseStep - 1]?.desc}
+                </span>
               ) : remediationLog ? (
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold">
                   All 7 Steps Completed • System IP Rotated to {remediationLog.newIp} & Reconnected to Main Server (10.10.0.1)
@@ -528,12 +527,12 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             {RESPONSE_STEPS.map((step) => {
               const isRemediationStep = step.id === 7;
               const isCurrent = (isAttacking && responseStep === step.id) || (isRemediating && isRemediationStep);
-              const isCompleted = (isAttacking && responseStep >= step.id) || (remediationLog && isRemediationStep);
+              const isCompleted = (isAttacking && responseStep > step.id) || (remediationLog && isRemediationStep);
 
               return (
                 <div
                   key={step.id}
-                  className={`p-2.5 rounded-sm border transition-all text-left ${
+                  className={`p-2.5 rounded-sm border transition-all text-left relative overflow-hidden ${
                     isCurrent
                       ? isRemediationStep
                         ? 'bg-cyan-600 text-white border-cyan-500 shadow-sm animate-pulse'
@@ -547,6 +546,11 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                     <span className="text-[9px] font-mono font-bold">
                       STEP 0{step.id}
                     </span>
+                    {isCurrent && (
+                      <span className="text-[8px] font-mono bg-black/25 px-1 py-0.5 rounded-xs font-bold uppercase tracking-wider text-white">
+                        3s ACTIVE
+                      </span>
+                    )}
                     {isCompleted && !isCurrent && (
                       <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                     )}
@@ -561,6 +565,18 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                         : 'Reconnecting to Main Server...' 
                       : step.desc}
                   </div>
+
+                  {/* Visual 3-second animated progress line while step is active */}
+                  {isCurrent && (
+                    <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 overflow-hidden">
+                      <div 
+                        className="h-full bg-white/90"
+                        style={{
+                          animation: 'stepTimerBar 3000ms linear forwards'
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
               );
             })}
