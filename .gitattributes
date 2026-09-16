@@ -1,0 +1,3 @@
+* linguist-detectable=false
+*.html linguist-detectable=true
+*.html linguist-language=HTML
