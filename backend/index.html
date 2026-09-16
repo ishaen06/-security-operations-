@@ -1,0 +1,451 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ABB Security Operations | Backend API & Telemetry Simulator</title>
+  <link rel="icon" type="image/svg+xml" href="../favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&family=Syncopate:wght@400;700&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            abb: {
+              red: '#FF000F',
+              lilac: '#615EEF',
+              violet: '#9061F9',
+              dark: '#0F1115',
+              card: '#16191E',
+              border: '#282D35',
+              muted: '#828B99',
+              lightBg: '#F8F9FA',
+              lightCard: '#FFFFFF',
+              lightBorder: '#E2E6EA'
+            }
+          },
+          fontFamily: {
+            sans: ['Plus Jakarta Sans', 'Inter', 'sans-serif'],
+            mono: ['JetBrains Mono', 'monospace'],
+            outrun: ['Syncopate', 'Space Grotesk', 'sans-serif']
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: rgba(0, 0, 0, 0.1); }
+    ::-webkit-scrollbar-thumb { background: #6C757D; border-radius: 3px; }
+  </style>
+</head>
+<body class="bg-abb-lightBg dark:bg-abb-dark text-[#181B1F] dark:text-[#F0F2F5] min-h-screen font-sans transition-colors duration-200">
+
+  <!-- ==================== HEADER ==================== -->
+  <header class="sticky top-0 z-40 bg-white/95 dark:bg-[#16191E]/95 backdrop-blur-sm border-b border-abb-lightBorder dark:border-abb-border transition-colors">
+    <div class="h-1 bg-abb-red w-full"></div>
+    <div class="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between gap-4">
+      
+      <div class="flex items-center gap-4">
+        <div class="flex items-center gap-2 cursor-pointer" onclick="window.location.href='../index.html'">
+          <div class="flex items-center gap-1.5">
+            <span class="w-3.5 h-3.5 bg-abb-red inline-block"></span>
+            <span class="font-outrun font-bold text-xl tracking-wider text-[#181B1F] dark:text-white">ABB</span>
+          </div>
+          <span class="hidden sm:inline-block h-4 w-px bg-gray-300 dark:bg-gray-700"></span>
+          <span class="hidden sm:inline-block font-mono text-[11px] uppercase tracking-widest text-[#6C757D] dark:text-abb-muted font-semibold">
+            BACKEND API & TELEMETRY ENGINE
+          </span>
+        </div>
+
+        <div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 dark:bg-emerald-950/80 border border-emerald-300 dark:border-emerald-700 rounded-sm">
+          <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+          <span class="text-[10px] font-mono font-bold text-emerald-700 dark:text-emerald-400 uppercase tracking-wider">DAEMON ACTIVE (HTML EDITION)</span>
+        </div>
+      </div>
+
+      <nav class="flex items-center gap-2 font-mono text-xs">
+        <a href="../index.html" class="px-3 py-1.5 rounded-sm border border-abb-lightBorder dark:border-abb-border hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-[#181B1F] dark:text-white flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          Unified Platform
+        </a>
+        <a href="../frontend/index.html" class="px-3 py-1.5 rounded-sm border border-abb-lightBorder dark:border-abb-border hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors text-[#181B1F] dark:text-white flex items-center gap-1.5">
+          <svg class="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2" ry="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+          Frontend Console
+        </a>
+
+        <!-- UTC Clock -->
+        <div class="hidden xl:flex items-center gap-2 px-3 py-1.5 rounded-sm bg-gray-100 dark:bg-black/40 border border-abb-lightBorder dark:border-abb-border text-[#6C757D] dark:text-abb-muted">
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+          <span id="utcTimeDisplay">--:--:-- UTC</span>
+        </div>
+
+        <!-- Theme Toggle -->
+        <button onclick="toggleTheme()" class="p-2 rounded-sm border border-abb-lightBorder dark:border-abb-border hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Toggle Theme">
+          <svg id="themeSunIcon" class="w-4 h-4 hidden dark:block" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+          <svg id="themeMoonIcon" class="w-4 h-4 block dark:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+        </button>
+      </nav>
+
+    </div>
+  </header>
+
+  <!-- ==================== MAIN CONTENT ==================== -->
+  <main class="max-w-[1700px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+    <!-- SERVER METRICS CARDS -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm">
+        <div class="flex items-center justify-between text-xs font-mono text-[#6C757D] dark:text-abb-muted uppercase">
+          <span>Backend State</span>
+          <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
+        </div>
+        <div class="mt-2 text-2xl font-bold font-mono text-emerald-600 dark:text-emerald-400">ONLINE 200 OK</div>
+        <div class="mt-1 text-[11px] font-mono text-[#6C757D] dark:text-abb-muted">Mock API Daemon & SSE Stream</div>
+      </div>
+
+      <div class="bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm">
+        <div class="flex items-center justify-between text-xs font-mono text-[#6C757D] dark:text-abb-muted uppercase">
+          <span>Packets Generated</span>
+          <svg class="w-4 h-4 text-abb-lilac" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+        </div>
+        <div id="metricTotalPackets" class="mt-2 text-2xl font-bold font-mono text-[#181B1F] dark:text-white">1,482</div>
+        <div class="mt-1 text-[11px] font-mono text-emerald-500 font-semibold">+1 pkt / 900ms telemetry burst</div>
+      </div>
+
+      <div class="bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm">
+        <div class="flex items-center justify-between text-xs font-mono text-[#6C757D] dark:text-abb-muted uppercase">
+          <span>Active SSE Subscribers</span>
+          <svg class="w-4 h-4 text-cyan-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        </div>
+        <div class="mt-2 text-2xl font-bold font-mono text-[#181B1F] dark:text-white">1 Active Session</div>
+        <div class="mt-1 text-[11px] font-mono text-[#6C757D] dark:text-abb-muted">Direct client event bus dispatch</div>
+      </div>
+
+      <div class="bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm">
+        <div class="flex items-center justify-between text-xs font-mono text-[#6C757D] dark:text-abb-muted uppercase">
+          <span>Server Uptime</span>
+          <svg class="w-4 h-4 text-amber-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+        </div>
+        <div id="metricUptime" class="mt-2 text-2xl font-bold font-mono text-[#181B1F] dark:text-white">00:04:32</div>
+        <div class="mt-1 text-[11px] font-mono text-[#6C757D] dark:text-abb-muted">Continuous HTML Engine Cycle</div>
+      </div>
+    </div>
+
+    <!-- API TESTER & SIMULATED SERVER LOGS -->
+    <div class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+
+      <!-- LEFT: INTERACTIVE REST & SSE ENDPOINT TESTER (5 COLS) -->
+      <div class="lg:col-span-5 space-y-4">
+        <div class="bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm">
+          <div class="flex items-center justify-between pb-3 mb-4 border-b border-abb-lightBorder dark:border-abb-border">
+            <div>
+              <h3 class="font-sans font-bold text-base text-[#181B1F] dark:text-white">Industrial REST API Endpoints</h3>
+              <p class="text-xs font-mono text-[#6C757D] dark:text-abb-muted mt-0.5">Click any endpoint to test in-browser execution</p>
+            </div>
+            <span class="px-2 py-0.5 bg-abb-red text-white text-[10px] font-mono font-bold rounded-xs">v1 API</span>
+          </div>
+
+          <div class="space-y-3">
+            <!-- Endpoint 1: Health -->
+            <div class="p-3 bg-gray-50 dark:bg-black/40 border border-abb-lightBorder dark:border-abb-border rounded-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold rounded-xs">GET</span>
+                  <span class="font-mono text-xs font-semibold text-[#181B1F] dark:text-white">/api/v1/health</span>
+                </div>
+                <button onclick="testApiHealth()" class="px-2.5 py-1 bg-abb-card dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-mono font-bold text-[#181B1F] dark:text-white rounded-xs transition-colors border border-abb-lightBorder dark:border-abb-border">
+                  Execute
+                </button>
+              </div>
+              <p class="text-[11px] font-mono text-[#6C757D] dark:text-abb-muted mt-1">Returns server health, sync status, and active C2 nodes.</p>
+            </div>
+
+            <!-- Endpoint 2: SSE Stream -->
+            <div class="p-3 bg-gray-50 dark:bg-black/40 border border-abb-lightBorder dark:border-abb-border rounded-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold rounded-xs">GET</span>
+                  <span class="font-mono text-xs font-semibold text-[#181B1F] dark:text-white">/api/v1/stream/traffic</span>
+                </div>
+                <button onclick="testApiStream()" class="px-2.5 py-1 bg-abb-card dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-mono font-bold text-[#181B1F] dark:text-white rounded-xs transition-colors border border-abb-lightBorder dark:border-abb-border">
+                  Execute
+                </button>
+              </div>
+              <p class="text-[11px] font-mono text-[#6C757D] dark:text-abb-muted mt-1">Fetches latest live Server-Sent Event (SSE) packet.</p>
+            </div>
+
+            <!-- Endpoint 3: Emergency Dataset -->
+            <div class="p-3 bg-gray-50 dark:bg-black/40 border border-abb-lightBorder dark:border-abb-border rounded-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold rounded-xs">GET</span>
+                  <span class="font-mono text-xs font-semibold text-[#181B1F] dark:text-white">/api/v1/emergency/dataset</span>
+                </div>
+                <button onclick="testApiDataset()" class="px-2.5 py-1 bg-abb-card dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 text-xs font-mono font-bold text-[#181B1F] dark:text-white rounded-xs transition-colors border border-abb-lightBorder dark:border-abb-border">
+                  Execute
+                </button>
+              </div>
+              <p class="text-[11px] font-mono text-[#6C757D] dark:text-abb-muted mt-1">Retrieves in-memory OT network assets and CVE database.</p>
+            </div>
+
+            <!-- Endpoint 4: Force Sync Burst -->
+            <div class="p-3 bg-gray-50 dark:bg-black/40 border border-abb-lightBorder dark:border-abb-border rounded-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-mono text-[10px] font-bold rounded-xs">POST</span>
+                  <span class="font-mono text-xs font-semibold text-[#181B1F] dark:text-white">/api/v1/emergency/force-sync</span>
+                </div>
+                <button onclick="testApiForceSync()" class="px-2.5 py-1 bg-blue-600 hover:bg-blue-500 text-white text-xs font-mono font-bold rounded-xs transition-colors">
+                  Inject
+                </button>
+              </div>
+              <p class="text-[11px] font-mono text-[#6C757D] dark:text-abb-muted mt-1">Injects 10-packet telemetry burst into stream.</p>
+            </div>
+
+            <!-- Endpoint 5: Remediation -->
+            <div class="p-3 bg-gray-50 dark:bg-black/40 border border-abb-lightBorder dark:border-abb-border rounded-sm">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <span class="px-2 py-0.5 bg-blue-100 dark:bg-blue-950 text-blue-700 dark:text-blue-300 font-mono text-[10px] font-bold rounded-xs">POST</span>
+                  <span class="font-mono text-xs font-semibold text-[#181B1F] dark:text-white">/api/v1/emergency/remediate</span>
+                </div>
+                <button onclick="testApiRemediate()" class="px-2.5 py-1 bg-cyan-600 hover:bg-cyan-500 text-white text-xs font-mono font-bold rounded-xs transition-colors">
+                  Remediate
+                </button>
+              </div>
+              <p class="text-[11px] font-mono text-[#6C757D] dark:text-abb-muted mt-1">Rotates IP from 10.10.30.42 to 10.10.30.198 with mutual TLS 1.3 handshake packet reconnection.</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- JSON RESPONSE VIEWER -->
+        <div class="bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm">
+          <div class="flex items-center justify-between pb-2 mb-2 border-b border-abb-lightBorder dark:border-abb-border">
+            <span class="font-mono text-xs font-bold text-[#181B1F] dark:text-white">HTTP Response Payload</span>
+            <span id="responseStatusBadge" class="px-2 py-0.5 bg-emerald-100 dark:bg-emerald-950 text-emerald-700 dark:text-emerald-300 font-mono text-[10px] font-bold rounded-xs">HTTP 200 OK</span>
+          </div>
+          <pre id="jsonResponseViewer" class="bg-gray-100 dark:bg-black/70 p-3 rounded-xs font-mono text-xs text-[#181B1F] dark:text-emerald-400 overflow-x-auto max-h-64">{
+  "status": "UP",
+  "mode": "REAL_TIME_LIVE_STREAMING",
+  "engine": "Standalone Pure HTML Backend",
+  "timestamp": "2026-09-16T16:20:00.000Z",
+  "subscribers": 1,
+  "telemetryBuffer": "ACTIVE"
+}</pre>
+        </div>
+      </div>
+
+      <!-- RIGHT: LIVE RFC-5424 SYSLOG & PACKET CAPTURE STREAM (7 COLS) -->
+      <div class="lg:col-span-7 bg-white dark:bg-abb-card border border-abb-lightBorder dark:border-abb-border p-5 rounded-sm shadow-sm flex flex-col">
+        <div class="flex items-center justify-between pb-3 mb-3 border-b border-abb-lightBorder dark:border-abb-border">
+          <div class="flex items-center gap-2">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 animate-pulse"></span>
+            <div>
+              <h3 class="font-sans font-bold text-base text-[#181B1F] dark:text-white">Live Daemon Telemetry & Syslog Console</h3>
+              <p class="text-xs font-mono text-[#6C757D] dark:text-abb-muted">Per-second NetFlow packet capture buffer (RFC-5424 industrial syslog format)</p>
+            </div>
+          </div>
+          <div class="flex items-center gap-2">
+            <button onclick="clearConsoleLogs()" class="px-2.5 py-1 text-xs font-mono border border-abb-lightBorder dark:border-abb-border hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xs text-[#6C757D] dark:text-abb-muted">
+              Clear
+            </button>
+            <button id="btnPauseStream" onclick="togglePauseStream()" class="px-2.5 py-1 text-xs font-mono bg-abb-card dark:bg-gray-800 border border-abb-lightBorder dark:border-abb-border rounded-xs text-[#181B1F] dark:text-white">
+              Pause
+            </button>
+          </div>
+        </div>
+
+        <div id="syslogConsole" class="bg-black/90 text-emerald-400 font-mono text-xs p-4 rounded-sm h-[520px] overflow-y-auto space-y-1.5 leading-relaxed border border-gray-800">
+          <div class="text-gray-500">// ABB CyberOps Real-Time Live Telemetry Engine Initialized</div>
+          <div class="text-gray-500">// Protocol parsers: MODBUS/TCP, IEC-104, OPC-UA, HTTPS, DNS, TLS 1.3</div>
+          <div class="text-gray-500">// Streaming active at 900ms nominal cycle</div>
+        </div>
+      </div>
+
+    </div>
+
+  </main>
+
+  <!-- ==================== BACKEND SCRIPT ==================== -->
+  <script>
+    let isStreamPaused = false;
+    let packetCount = 1482;
+    let startTime = Date.now();
+
+    const PROTOCOLS = ['MODBUS/TCP', 'IEC-104', 'OPC-UA', 'SSH', 'HTTPS', 'DNS'];
+    const SEVERITIES = ['Low', 'Low', 'Low', 'Medium'];
+
+    // Uptime & Packet Counter
+    setInterval(() => {
+      const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
+      const hrs = String(Math.floor(elapsedSeconds / 3600)).padStart(2, '0');
+      const mins = String(Math.floor((elapsedSeconds % 3600) / 60)).padStart(2, '0');
+      const secs = String(elapsedSeconds % 60).padStart(2, '0');
+      const elUptime = document.getElementById('metricUptime');
+      if (elUptime) elUptime.innerText = `${hrs}:${mins}:${secs}`;
+    }, 1000);
+
+    // Live Stream Simulator
+    setInterval(() => {
+      if (isStreamPaused) return;
+      packetCount++;
+      const elPkt = document.getElementById('metricTotalPackets');
+      if (elPkt) elPkt.innerText = packetCount.toLocaleString();
+
+      const now = new Date();
+      const timeIso = now.toISOString();
+      const p = PROTOCOLS[Math.floor(Math.random() * PROTOCOLS.length)];
+      const src = `10.10.${Math.floor(Math.random()*3+1)*10}.${Math.floor(Math.random()*50+5)}`;
+      const dst = '10.10.0.1';
+      const pktId = `PKT-${packetCount}`;
+
+      const logLine = `<134>1 ${timeIso} abb-sensor-01 packet-flow - [flow@32473 id="${pktId}" src="${src}" dst="${dst}" proto="${p}" action="ALLOW" sev="Low"] Stateful SCADA packet telemetry validated`;
+
+      appendSyslog(logLine, 'text-emerald-400');
+    }, 900);
+
+    function appendSyslog(text, colorClass = 'text-gray-300') {
+      const c = document.getElementById('syslogConsole');
+      if (!c) return;
+      const line = document.createElement('div');
+      line.className = colorClass;
+      line.innerText = text;
+      c.appendChild(line);
+      c.scrollTop = c.scrollHeight;
+    }
+
+    function clearConsoleLogs() {
+      const c = document.getElementById('syslogConsole');
+      if (c) c.innerHTML = '<div class="text-gray-500">// Console buffer cleared</div>';
+    }
+
+    function togglePauseStream() {
+      isStreamPaused = !isStreamPaused;
+      const b = document.getElementById('btnPauseStream');
+      if (b) b.innerText = isStreamPaused ? 'Resume' : 'Pause';
+    }
+
+    // --- API HANDLERS ---
+    function setResponse(status, json) {
+      const badge = document.getElementById('responseStatusBadge');
+      const viewer = document.getElementById('jsonResponseViewer');
+      if (badge) badge.innerText = `HTTP ${status} OK`;
+      if (viewer) viewer.innerText = JSON.stringify(json, null, 2);
+    }
+
+    function testApiHealth() {
+      setResponse(200, {
+        status: "UP",
+        mode: "REAL_TIME_LIVE_STREAMING",
+        uptimeSeconds: Math.floor((Date.now() - startTime) / 1000),
+        timestamp: new Date().toISOString(),
+        datasetAvailable: true,
+        c2NodeCount: 3,
+        cveCount: 4,
+        activeSSEClients: 1
+      });
+      appendSyslog(`[API CALL] GET /api/v1/health -> 200 OK`, 'text-cyan-400');
+    }
+
+    function testApiStream() {
+      const pkt = {
+        type: "TELEMETRY_PACKET",
+        id: `PKT-${packetCount}`,
+        timestamp: new Date().toISOString(),
+        src: "10.10.30.42",
+        dst: "10.10.0.1",
+        protocol: "IEC-104",
+        action: "ALLOW",
+        bytes: 256,
+        severity: "Low",
+        message: "Substation RTU breaker status verified"
+      };
+      setResponse(200, pkt);
+      appendSyslog(`[API CALL] GET /api/v1/stream/traffic -> 200 OK (SSE event dispatched)`, 'text-cyan-400');
+    }
+
+    function testApiDataset() {
+      setResponse(200, {
+        subnets: [
+          { id: "subnet-a", name: "Subnet A: OT Robotics (OmniCore)", cidr: "10.10.10.0/24", risk: "Nominal" },
+          { id: "subnet-b", name: "Subnet B: Power Grid & Substation RTU", cidr: "10.10.20.0/24", risk: "Nominal" },
+          { id: "subnet-c", name: "Subnet C: Industrial IoT & PLC Sensors", cidr: "10.10.30.0/24", risk: "Monitored" },
+          { id: "dmz", name: "DMZ Inspection & Telemetry Sensor", cidr: "172.16.0.0/24", risk: "Nominal" },
+          { id: "it-corp", name: "IT Corporate Network", cidr: "192.168.1.0/24", risk: "Nominal" }
+        ],
+        c2ThreatNodes: ["194.26.29.112", "185.220.101.5", "91.240.118.172"],
+        knownExploitedCVEs: ["CVE-2024-21887", "CVE-2023-3519", "CVE-2023-4966", "CVE-2024-3400"]
+      });
+      appendSyslog(`[API CALL] GET /api/v1/emergency/dataset -> 200 OK`, 'text-cyan-400');
+    }
+
+    function testApiForceSync() {
+      packetCount += 10;
+      setResponse(200, {
+        status: "Live burst packet injection committed",
+        packetsInjected: 10,
+        timestamp: new Date().toISOString()
+      });
+      appendSyslog(`[API CALL] POST /api/v1/emergency/force-sync -> 200 OK (+10 packets injected)`, 'text-amber-400');
+      for (let i = 0; i < 3; i++) {
+        appendSyslog(`  [BURST] Injected packet PKT-${packetCount - i} (MODBUS/TCP ALLOW)`, 'text-amber-300');
+      }
+    }
+
+    function testApiRemediate() {
+      const now = new Date().toISOString();
+      const remediationData = {
+        status: "SUCCESS",
+        message: "Remediation executed for compromised RTU node: IP rotated from 10.10.30.42 to 10.10.30.198, reconnected to Main Server 10.10.0.1",
+        packet: {
+          id: `PKT-REM-${Date.now().toString().slice(-6)}`,
+          timestamp: now,
+          src_ip: "10.10.30.198",
+          dst_ip: "10.10.0.1",
+          protocol: "TLS 1.3",
+          action: "ALLOW",
+          bytes: 1420,
+          packets: 12,
+          threat_score: 0,
+          severity: "Low",
+          flag: "SYN,ACK,TLS_HANDSHAKE",
+          message: "REMEDIATION SUCCESS: System [PLC-RTU-03] IP address changed from 10.10.30.42 to 10.10.30.198. Secure mutual TLS 1.3 re-established with Main Server (10.10.0.1). Local ARP cache flushed."
+        }
+      };
+      setResponse(200, remediationData);
+      appendSyslog(`[API CALL] POST /api/v1/emergency/remediate -> 200 OK (IP ROTATION 10.10.30.42 -> 10.10.30.198)`, 'text-red-400 font-bold');
+      appendSyslog(`  [REMEDIATION] TLS 1.3 Mutual Handshake established with Main Server (10.10.0.1)`, 'text-emerald-400 font-bold');
+    }
+
+    // --- UTC CLOCK ---
+    function updateClock() {
+      const now = new Date();
+      const utc = now.toISOString().substring(11, 19) + ' UTC';
+      const el = document.getElementById('utcTimeDisplay');
+      if (el) el.innerText = utc;
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // --- THEME TOGGLE ---
+    function toggleTheme() {
+      const html = document.documentElement;
+      if (html.classList.contains('dark')) {
+        html.classList.remove('dark');
+        localStorage.setItem('abb_theme', 'light');
+      } else {
+        html.classList.add('dark');
+        localStorage.setItem('abb_theme', 'dark');
+      }
+    }
+    if (localStorage.getItem('abb_theme') === 'light') {
+      document.documentElement.classList.remove('dark');
+    }
+  </script>
+</body>
+</html>
