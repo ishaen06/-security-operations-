@@ -240,9 +240,110 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
   const subnetReqDur = flowSpeed === 'slow' ? '5.2s' : '2.6s';
   const subnetDataDur = flowSpeed === 'slow' ? '5.8s' : '2.9s';
 
-  // Sequential progression when attack is simulated (Fast, brisk progression to Step 6: Incident Logging)
+  // Remediation Action: Change device IP address and reconnect to server in the simulation
+  const executeRemediation = (targetSubnet: SubnetId, targetDevice: VulnerableDevice) => {
+    setIsRemediating(true);
+    setResponseStep(7); // Advance Step 7: REMEDIATION & RECONNECTION
+
+    const oldIp = targetDevice.ip;
+    const hostname = targetDevice.hostname;
+
+    // Calculate new clean IP address on this subnet
+    const prefix = targetSubnet === 'subnet-a' ? '10.10.10.' : targetSubnet === 'subnet-b' ? '10.10.20.' : '10.10.30.';
+    const currentSuffix = parseInt(oldIp.split('.').pop() || '10', 10);
+    const newSuffix = currentSuffix < 150 ? currentSuffix + 140 : currentSuffix - 50;
+    const newIp = `${prefix}${newSuffix}`;
+
+    setRemediationInfo({
+      hostname,
+      oldIp,
+      newIp,
+      subnetId: targetSubnet,
+      deviceId: targetDevice.id
+    });
+
+    // PHASE 1: Re-assign IP Lease of the system (starts immediately)
+    setRemediationPhase('assigning_ip');
+
+    // PHASE 2 (after 400ms): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Main Server (10.10.0.1)
+    setTimeout(() => {
+      // Reassign IP address of device in subnet state immediately so nodes update on canvas
+      setSubnets(prev => {
+        const currentSubnet = prev[targetSubnet];
+        if (!currentSubnet) return prev;
+        return {
+          ...prev,
+          [targetSubnet]: {
+            ...currentSubnet,
+            vulnerableDevices: currentSubnet.vulnerableDevices.map(d => 
+              d.id === targetDevice.id ? { ...d, ip: newIp } : d
+            )
+          }
+        };
+      });
+
+      setRemediationPhase('reconnecting');
+      setReconnectingSubnetId(targetSubnet);
+    }, 400);
+
+    // PHASE 3 (after 1050ms total): Main Server acknowledges reconnection, TLS tunnel active, telemetry restored
+    setTimeout(() => {
+      setRemediationPhase('restored');
+      setRemediationLog({
+        hostname,
+        oldIp,
+        newIp,
+        timestamp: new Date().toLocaleTimeString()
+      });
+
+      setIsRemediating(false);
+      setAttackedSubnetId(null);
+      setAttackedDevice(null);
+      setReconnectingSubnetId(null);
+
+      // Commit remediation event to backend server so log is written to emergency_traffic.log and streamed live
+      fetch('http://localhost:5000/api/v1/emergency/remediate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          hostname,
+          oldIp,
+          newIp,
+          subnetId: targetSubnet,
+          serverIp: '10.10.0.1'
+        })
+      }).catch(() => {});
+
+      // Reset phase to idle after displaying verification
+      setTimeout(() => {
+        setRemediationPhase('idle');
+      }, 3000);
+
+      // Broadcast remediation completion and server reconnection to global feeds
+      window.dispatchEvent(new CustomEvent('abb_attack_state', {
+        detail: {
+          isAttacking: false,
+          subnetId: null,
+          attackType: null,
+          targetDevice: null,
+          remediation: {
+            hostname,
+            oldIp,
+            newIp,
+            reconnected: true,
+            serverIp: '10.10.0.1'
+          }
+        }
+      }));
+    }, 1050);
+  };
+
+  // Sequential progression when attack is simulated:
+  // Step 1: Detection -> Step 2: Classification -> Step 3: Subnet Identification ->
+  // Step 4: Risk Assessment -> Step 5: Network Isolation -> Step 6: Incident Logging (completed) ->
+  // Automated Remediation: IP address rotated & system reconnected to Main Server (10.10.0.1)
   useEffect(() => {
-    if (!attackedSubnetId) {
+    if (!attackedSubnetId || !attackedDevice) {
       if (!isRemediating) {
         setResponseStep(0);
       }
@@ -250,16 +351,23 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     }
 
     setResponseStep(1);
+    const targetSubnet = attackedSubnetId;
+    const targetDevice = attackedDevice;
+
     const timers = [
-      setTimeout(() => setResponseStep(2), 120),
-      setTimeout(() => setResponseStep(3), 240),
-      setTimeout(() => setResponseStep(4), 380),
-      setTimeout(() => setResponseStep(5), 520),
-      setTimeout(() => setResponseStep(6), 680),
+      setTimeout(() => setResponseStep(2), 140), // Step 2: Classification
+      setTimeout(() => setResponseStep(3), 280), // Step 3: Subnet Identification
+      setTimeout(() => setResponseStep(4), 420), // Step 4: Risk Assessment
+      setTimeout(() => setResponseStep(5), 560), // Step 5: Network Isolation
+      setTimeout(() => setResponseStep(6), 700), // Step 6: Incident Logging in progress
+      // Automatically execute remediation once Step 6 (Incident Logging) is completed:
+      setTimeout(() => {
+        executeRemediation(targetSubnet, targetDevice);
+      }, 1300),
     ];
 
     return () => timers.forEach(t => clearTimeout(t));
-  }, [attackedSubnetId, isRemediating]);
+  }, [attackedSubnetId, attackedDevice]);
 
   const handleSimulateAttack = (subnetId: SubnetId, targetDevice?: VulnerableDevice) => {
     const now = new Date();
@@ -316,96 +424,13 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     }));
   };
 
-  // Remediation Action: Change device IP address and reconnect to server in the simulation (Fast & Responsive)
+  // Manual Trigger fallback for Remediate button
   const handleRemediate = () => {
     if (!attackedDevice || !attackedSubnetId) {
       handleReset();
       return;
     }
-
-    setIsRemediating(true);
-    setResponseStep(7); // Advance Step 7: REMEDIATION
-
-    const targetSubnet = attackedSubnetId;
-    const targetDevice = attackedDevice;
-    const oldIp = targetDevice.ip;
-    const hostname = targetDevice.hostname;
-
-    // Calculate new clean IP address on this subnet
-    const prefix = targetSubnet === 'subnet-a' ? '10.10.10.' : targetSubnet === 'subnet-b' ? '10.10.20.' : '10.10.30.';
-    const currentSuffix = parseInt(oldIp.split('.').pop() || '10', 10);
-    const newSuffix = currentSuffix < 150 ? currentSuffix + 140 : currentSuffix - 50;
-    const newIp = `${prefix}${newSuffix}`;
-
-    setRemediationInfo({
-      hostname,
-      oldIp,
-      newIp,
-      subnetId: targetSubnet,
-      deviceId: targetDevice.id
-    });
-
-    // PHASE 1: Re-assign IP Lease (starts immediately)
-    setRemediationPhase('assigning_ip');
-
-    // PHASE 2 (after 350ms): Device receives new IP, initiates fast TLS 1.3 handshake to reconnect to Core Server (10.10.0.1)
-    setTimeout(() => {
-      // Reassign IP address of device in subnet state immediately so nodes update
-      setSubnets(prev => {
-        const currentSubnet = prev[targetSubnet];
-        if (!currentSubnet) return prev;
-        return {
-          ...prev,
-          [targetSubnet]: {
-            ...currentSubnet,
-            vulnerableDevices: currentSubnet.vulnerableDevices.map(d => 
-              d.id === targetDevice.id ? { ...d, ip: newIp } : d
-            )
-          }
-        };
-      });
-
-      setRemediationPhase('reconnecting');
-      setReconnectingSubnetId(targetSubnet);
-    }, 350);
-
-    // PHASE 3 (after 900ms total): Server acknowledges reconnection, TLS tunnel active, telemetry restored
-    setTimeout(() => {
-      setRemediationPhase('restored');
-      setRemediationLog({
-        hostname,
-        oldIp,
-        newIp,
-        timestamp: new Date().toLocaleTimeString()
-      });
-
-      setIsRemediating(false);
-      setAttackedSubnetId(null);
-      setAttackedDevice(null);
-      setReconnectingSubnetId(null);
-
-      // Reset phase to idle after displaying verification
-      setTimeout(() => {
-        setRemediationPhase('idle');
-      }, 2500);
-
-      // Broadcast remediation completion and server reconnection to global feeds
-      window.dispatchEvent(new CustomEvent('abb_attack_state', {
-        detail: {
-          isAttacking: false,
-          subnetId: null,
-          attackType: null,
-          targetDevice: null,
-          remediation: {
-            hostname,
-            oldIp,
-            newIp,
-            reconnected: true,
-            serverIp: '10.10.0.1'
-          }
-        }
-      }));
-    }, 900);
+    executeRemediation(attackedSubnetId, attackedDevice);
   };
 
   const isAttacking = attackedSubnetId !== null;
@@ -477,15 +502,21 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             <span className="text-[10px] font-mono text-[#6C757D] dark:text-[#9BA3AF]">
               {isRemediating ? (
                 <span className="text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
-                  Step 7 Active: IP Re-assignment & Core Reconnection...
+                  Step 7 Active: Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
                 </span>
               ) : isAttacking ? (
-                <span className="text-[#FF000F] font-bold">
-                  Phase {responseStep} of 7 active • Airgap enforced
-                </span>
+                responseStep === 6 ? (
+                  <span className="text-amber-600 dark:text-amber-400 font-bold animate-pulse">
+                    Step 6: Logging Completed (SIEM Audit Committed) → Automating Remediation...
+                  </span>
+                ) : (
+                  <span className="text-[#FF000F] font-bold">
+                    Phase {responseStep} of 7 active • Airgap isolation enforced
+                  </span>
+                )
               ) : remediationLog ? (
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold">
-                  All 7 Steps Executed • Device Reconnected to Server
+                  All 7 Steps Completed • System IP Rotated to {remediationLog.newIp} & Reconnected to Main Server (10.10.0.1)
                 </span>
               ) : (
                 'Standing by for telemetry trigger'
@@ -526,8 +557,8 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                   <div className={`text-[9px] truncate mt-0.5 ${isCurrent ? 'text-white/90' : 'text-[#6C757D]'}`}>
                     {isRemediationStep && isRemediating 
                       ? remediationPhase === 'assigning_ip' 
-                        ? 'Re-assigning IP address...' 
-                        : 'Reconnecting to server...' 
+                        ? 'Rotating IP address...' 
+                        : 'Reconnecting to Main Server...' 
                       : step.desc}
                   </div>
                 </div>
@@ -578,20 +609,20 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
               <div className="w-3.5 h-3.5 rounded-full bg-cyan-400 animate-ping shrink-0" />
               <div>
                 <div className="font-bold text-cyan-400 flex items-center gap-2 text-xs">
-                  <span>LIVE REMEDIATION SIMULATION ACTIVE</span>
+                  <span>LOGGING COMPLETED → AUTOMATED REMEDIATION ACTIVE</span>
                   <span className="text-[9px] px-2 py-0.5 bg-cyan-950 text-cyan-300 border border-cyan-700 rounded-xs font-bold uppercase tracking-wider">
-                    {remediationPhase === 'assigning_ip' ? 'Phase 1: Dynamic IP Re-assignment' : 'Phase 2: Core Server Reconnection'}
+                    {remediationPhase === 'assigning_ip' ? 'Step 1: System IP Rotation' : 'Step 2: Main Server Reconnection'}
                   </span>
                 </div>
                 <div className="text-gray-300 text-[11px] mt-0.5">
                   {remediationPhase === 'assigning_ip' && (
                     <span>
-                      Allocating clean DHCP IP lease for <strong>{remediationInfo.hostname}</strong>: changing IP from <span className="line-through text-red-400 font-bold">{remediationInfo.oldIp}</span> to <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 py-0.2 rounded-xs">{remediationInfo.newIp}</span> and flushing local ARP cache...
+                      Incident logging completed. Rotating IP address of <strong>{remediationInfo.hostname}</strong> from <span className="line-through text-red-400 font-bold">{remediationInfo.oldIp}</span> to new lease <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 py-0.2 rounded-xs">{remediationInfo.newIp}</span> and flushing local ARP cache...
                     </span>
                   )}
                   {remediationPhase === 'reconnecting' && (
                     <span>
-                      Establishing mutual TLS 1.3 cryptographic session from newly assigned IP <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 py-0.2 rounded-xs">{remediationInfo.newIp}</span> through Gateway to Primary Core Host <strong>10.10.0.1</strong>...
+                      Establishing secure mutual TLS 1.3 cryptographic session from newly assigned IP <span className="text-emerald-400 font-bold bg-emerald-950/80 px-1 py-0.2 rounded-xs">{remediationInfo.newIp}</span> through Gateway to Main Server <strong>10.10.0.1</strong>...
                     </span>
                   )}
                 </div>
@@ -599,7 +630,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             </div>
             <div className="text-right shrink-0">
               <span className="px-2 py-1 bg-cyan-900/80 text-cyan-200 rounded-xs text-[10px] font-bold border border-cyan-600">
-                {remediationPhase === 'assigning_ip' ? 'STEP 1: IP ROTATION' : 'STEP 2: TLS HANDSHAKE'}
+                {remediationPhase === 'assigning_ip' ? 'IP ROTATED' : 'RECONNECTING MAIN SERVER'}
               </span>
             </div>
           </div>
@@ -730,7 +761,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             {/* Micro indicators alongside conduit */}
             {remediationPhase === 'reconnecting' ? (
               <div className="absolute left-1/2 -translate-x-1/2 text-[9px] font-mono font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-1 animate-pulse bg-white/90 dark:bg-black/90 px-2 py-0.5 rounded-xs border border-cyan-500 shadow-sm">
-                <span>↑ RECONNECTING NEW IP ({remediationInfo?.newIp}) TO CORE 10.10.0.1</span>
+                <span>↑ RECONNECTING NEW IP ({remediationInfo?.newIp}) TO MAIN SERVER 10.10.0.1</span>
               </div>
             ) : (
               <>
@@ -1073,7 +1104,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 }}
               >
                 <span className="w-2 h-2 rounded-full bg-cyan-300 animate-ping" />
-                <span>TLS HANDSHAKE: RECONNECTING {remediationInfo.newIp} → 10.10.0.1</span>
+                <span>TLS HANDSHAKE: RECONNECTING {remediationInfo.newIp} TO MAIN SERVER (10.10.0.1)</span>
               </div>
             )}
 
@@ -1086,7 +1117,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                 }}
               >
                 <CheckCircle2 className="w-3 h-3" />
-                <span>RECONNECTED • IP {remediationInfo.newIp} VERIFIED</span>
+                <span>RECONNECTED • IP {remediationInfo.newIp} SECURED WITH MAIN SERVER</span>
               </div>
             )}
           </div>

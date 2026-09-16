@@ -194,6 +194,55 @@ const server = http.createServer((req, res) => {
     return;
   }
 
+  // Route: Commit System Remediation (IP rotation & main server reconnection)
+  if (url.pathname === '/api/v1/emergency/remediate' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => { body += chunk; });
+    req.on('end', () => {
+      let data = {};
+      try { data = JSON.parse(body); } catch {}
+      const now = new Date().toISOString();
+      const hostname = data.hostname || 'compromised-node';
+      const oldIp = data.oldIp || '10.10.30.42';
+      const newIp = data.newIp || '10.10.30.198';
+      const serverIp = data.serverIp || '10.10.0.1';
+
+      const remediationPacket = {
+        id: `PKT-REM-${Date.now().toString().slice(-6)}`,
+        timestamp: now,
+        src_ip: newIp,
+        dst_ip: serverIp,
+        src_port: 54102,
+        dst_port: 443,
+        protocol: 'TLS 1.3',
+        action: 'ALLOW',
+        bytes: 1420,
+        packets: 12,
+        threat_score: 0,
+        severity: 'Low',
+        flag: 'SYN,ACK,TLS_HANDSHAKE',
+        message: `REMEDIATION SUCCESS: System [${hostname}] IP address changed from ${oldIp} to ${newIp}. Secure mutual TLS 1.3 re-established with Main Server (${serverIp}). Local ARP cache flushed.`
+      };
+
+      appendToLogFile(remediationPacket);
+
+      if (sseClients.size > 0) {
+        const payload = `data: ${JSON.stringify(remediationPacket)}\n\n`;
+        for (const client of sseClients) {
+          client.write(payload);
+        }
+      }
+
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        status: 'SUCCESS',
+        message: `Remediation executed for ${hostname}: IP rotated from ${oldIp} to ${newIp}, reconnected to Main Server ${serverIp}`,
+        packet: remediationPacket
+      }));
+    });
+    return;
+  }
+
   // Route: Get Emergency Dataset
   if (url.pathname === '/api/v1/emergency/dataset') {
     if (!fs.existsSync(DATASET_FILE)) {
