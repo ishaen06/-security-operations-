@@ -262,10 +262,10 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
       deviceId: targetDevice.id
     });
 
-    // PHASE 1: Re-assign IP Lease of the system (starts immediately, lasts 1.5s)
+    // PHASE 1: Re-assign IP Lease of the system (starts immediately, lasts 2.5s)
     setRemediationPhase('assigning_ip');
 
-    // PHASE 2 (after 1500ms): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Main Server (10.10.0.1)
+    // PHASE 2 (after 2500ms): Device receives new IP, initiates TLS 1.3 handshake to reconnect to Main Server (10.10.0.1)
     setTimeout(() => {
       // Reassign IP address of device in subnet state immediately so nodes update on canvas
       setSubnets(prev => {
@@ -284,9 +284,9 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
 
       setRemediationPhase('reconnecting');
       setReconnectingSubnetId(targetSubnet);
-    }, 1500);
+    }, 2500);
 
-    // PHASE 3 (after 3000ms total = 3s duration for Step 7): Main Server acknowledges reconnection, TLS tunnel active, telemetry restored
+    // PHASE 3 (after 5000ms total = 5s duration for Step 7): Main Server acknowledges reconnection, TLS tunnel active, telemetry restored
     setTimeout(() => {
       setRemediationPhase('restored');
       setRemediationLog({
@@ -335,18 +335,18 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
           }
         }
       }));
-    }, 3000);
+    }, 5000);
   };
 
   // Sequential progression when attack is simulated:
-  // Each step runs for exactly 3 seconds:
+  // Steps 1 to 6 run for 3 seconds each; Step 7 (Remediation) runs for 5 seconds:
   // Step 1: Detection (0s - 3s)
   // Step 2: Classification (3s - 6s)
   // Step 3: Subnet Identification (6s - 9s)
   // Step 4: Risk Assessment (9s - 12s)
   // Step 5: Network Isolation (12s - 15s)
   // Step 6: Incident Logging (15s - 18s)
-  // Step 7: Automated Remediation (18s - 21s) -> IP address rotated & system reconnected to Main Server (10.10.0.1)
+  // Step 7: Automated Remediation (18s - 23s, 5s duration) -> IP rotated & system reconnected to Main Server (10.10.0.1)
   useEffect(() => {
     if (!attackedSubnetId || !attackedDevice) {
       if (!isRemediating) {
@@ -507,7 +507,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             <span className="text-[10px] font-mono text-[#6C757D] dark:text-[#9BA3AF]">
               {isRemediating ? (
                 <span className="text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
-                  Step 7 Active (3s): Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
+                  Step 7 Active (5s): Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
                 </span>
               ) : isAttacking ? (
                 <span className="text-[#FF000F] font-bold">
@@ -548,7 +548,7 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                     </span>
                     {isCurrent && (
                       <span className="text-[8px] font-mono bg-black/25 px-1 py-0.5 rounded-xs font-bold uppercase tracking-wider text-white">
-                        3s ACTIVE
+                        {isRemediationStep ? '5s ACTIVE' : '3s ACTIVE'}
                       </span>
                     )}
                     {isCompleted && !isCurrent && (
@@ -566,13 +566,13 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                       : step.desc}
                   </div>
 
-                  {/* Visual 3-second animated progress line while step is active */}
+                  {/* Visual animated progress line while step is active (5s for Step 7 Remediation, 3s for Steps 1-6) */}
                   {isCurrent && (
                     <div className="absolute bottom-0 left-0 right-0 h-1 bg-black/20 overflow-hidden">
                       <div 
                         className="h-full bg-white/90"
                         style={{
-                          animation: 'stepTimerBar 3000ms linear forwards'
+                          animation: `stepTimerBar ${isRemediationStep ? '5000ms' : '3000ms'} linear forwards`
                         }}
                       />
                     </div>
