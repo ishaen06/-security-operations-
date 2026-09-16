@@ -507,11 +507,11 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
             <span className="text-[10px] font-mono text-[#6C757D] dark:text-[#9BA3AF]">
               {isRemediating ? (
                 <span className="text-cyan-600 dark:text-cyan-400 font-bold animate-pulse">
-                  Step 7 Active (5s): Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
+                  Step 7 Active: Rotating IP ({remediationInfo?.oldIp} → {remediationInfo?.newIp}) & Reconnecting to Main Server (10.10.0.1)...
                 </span>
               ) : isAttacking ? (
                 <span className="text-[#FF000F] font-bold">
-                  Step {responseStep} of 7 Active (3s) • {RESPONSE_STEPS[responseStep - 1]?.label}: {RESPONSE_STEPS[responseStep - 1]?.desc}
+                  Step {responseStep} of 7 Active • {RESPONSE_STEPS[responseStep - 1]?.label}: {RESPONSE_STEPS[responseStep - 1]?.desc}
                 </span>
               ) : remediationLog ? (
                 <span className="text-emerald-600 dark:text-emerald-400 font-bold">
@@ -546,11 +546,6 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
                     <span className="text-[9px] font-mono font-bold">
                       STEP 0{step.id}
                     </span>
-                    {isCurrent && (
-                      <span className="text-[8px] font-mono bg-black/25 px-1 py-0.5 rounded-xs font-bold uppercase tracking-wider text-white">
-                        {isRemediationStep ? '5s ACTIVE' : '3s ACTIVE'}
-                      </span>
-                    )}
                     {isCompleted && !isCurrent && (
                       <CheckCircle2 className="w-3 h-3 text-emerald-500" />
                     )}
