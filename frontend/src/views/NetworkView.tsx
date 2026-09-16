@@ -11,7 +11,7 @@ import { MOCK_SUBNETS } from '../data/mockSecurityData';
 import { NetworkSubnet, NetworkHost } from '../types/cybersecurity';
 import { SeverityBadge } from '../components/common/Badges';
 import { AbbCard } from '../components/common/AbbCard';
-import { RrCenterTopologyVisualizer } from '../components/network/RrCenterTopologyVisualizer';
+import { TopologyVisualizer } from '../components/network/TopologyVisualizer';
 
 interface NetworkViewProps {
   initialSubnetCidr?: string;
@@ -94,7 +94,7 @@ export const NetworkView: React.FC<NetworkViewProps> = ({
       </div>
 
       {/* Core Network Threat Detection, Isolation & Incident Response Visualization */}
-      <RrCenterTopologyVisualizer />
+      <TopologyVisualizer />
 
       {/* Top Network Architecture Flow (Internet ↓ Firewall ↓ Router ↓ Multiple Subnets ↓ Hosts) */}
       <div className="bg-white dark:bg-[#16191E] border border-[#E2E6EA] dark:border-[#282D35] p-5 rounded-sm shadow-industrial">

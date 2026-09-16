@@ -11,7 +11,7 @@ import { NetworkFlowDiagram } from '../components/dashboard/NetworkFlowDiagram';
 import { IncidentTrendChart } from '../components/dashboard/IncidentTrendChart';
 import { IncidentDetailPanel } from '../components/incidents/IncidentDetailPanel';
 import { AbbCard } from '../components/common/AbbCard';
-import { RrCenterTopologyVisualizer } from '../components/network/RrCenterTopologyVisualizer';
+import { TopologyVisualizer } from '../components/network/TopologyVisualizer';
 import { LiveLogsTable } from '../components/dashboard/LiveLogsTable';
 
 interface DashboardViewProps {
@@ -62,7 +62,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       </div>
 
       {/* Core Network Threat Detection, Isolation & Incident Response Visualization */}
-      <RrCenterTopologyVisualizer />
+      <TopologyVisualizer />
 
       {/* Emergency Drill Alert Notice Banner */}
       {isDrillActive && (

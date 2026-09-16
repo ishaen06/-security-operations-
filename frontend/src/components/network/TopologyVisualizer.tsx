@@ -207,7 +207,7 @@ const RESPONSE_STEPS = [
   { id: 7, label: 'REMEDIATION', desc: 'IP re-assigned & server reconnected' }
 ];
 
-export const RrCenterTopologyVisualizer: React.FC = () => {
+export const TopologyVisualizer: React.FC = () => {
   const [subnets, setSubnets] = useState<Record<SubnetId, SubnetData>>(INITIAL_SUBNETS);
   const [attackedSubnetId, setAttackedSubnetId] = useState<SubnetId | null>(null);
   const [attackedDevice, setAttackedDevice] = useState<VulnerableDevice | null>(null);
@@ -1868,3 +1868,5 @@ export const RrCenterTopologyVisualizer: React.FC = () => {
     </div>
   );
 };
+
+export { TopologyVisualizer as RrCenterTopologyVisualizer };
